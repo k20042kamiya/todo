@@ -1,0 +1,39 @@
+/*
+ * グローバルスタイル - アプリ全体に適用されるベーススタイル
+ *
+ * CSS の基本:
+ *   セレクタ { プロパティ: 値; }
+ *
+ *   * → 全ての要素
+ *   body → <body> 要素
+ *   #app → id="app" の要素
+ *   .class → class="class" の要素
+ */
+
+/* box-sizing: border-box を全要素に適用 */
+/* padding や border が width に含まれるようになる（レイアウトが楽になる） */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  /* システムフォントを使用（OS標準のきれいなフォント） */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans JP', sans-serif;
+  /* 温かみのあるベージュ系背景色 */
+  background-color: #f0ebe4;
+  color: #2c2c2c;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* アプリのメインコンテナ: 中央寄せ、最大幅制限 */
+#app {
+  max-width: 720px;
+  margin: 0 auto; /* 左右のマージンを自動にすると中央寄せになる */
+  padding: 40px 20px;
+}
