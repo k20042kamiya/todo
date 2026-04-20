@@ -1,0 +1,32 @@
+# Secrets & credentials
+backend/*adminsdk*.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Go
+backend/vendor/
+lambda/vendor/
+*.exe
+*.test
+*.out
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
