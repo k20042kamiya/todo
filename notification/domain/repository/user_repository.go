@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"lambda/domain/entity"
+	"notification/domain/entity"
 )
 
 type UserRepository interface {

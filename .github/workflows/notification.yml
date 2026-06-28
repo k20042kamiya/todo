@@ -1,0 +1,171 @@
+# notification.yml
+#
+# 【必要な GitHub Secrets / Variables】
+# Secrets:
+#   AWS_ROLE_ARN                   - OIDC用IAMロールARN
+# Variables:
+#   AWS_REGION                     - AWSリージョン (例: ap-northeast-1)
+#   ECR_REPOSITORY_NOTIFICATION    - 通知バッチ用ECRリポジトリ名 (例: todo-notification)
+#   ECS_NOTIFICATION_TASK_FAMILY   - ECSタスク定義ファミリー名 (例: todo-notification)
+#   EVENTBRIDGE_SCHEDULE_NAME      - EventBridge Schedulerスケジュール名 (例: todo-daily-notification)
+#
+# 【AWS側の事前設定】
+# 1. IAM OIDC プロバイダー設定 (backend.ymlと共通)
+# 2. IAMロールに付与するポリシー:
+#    - AmazonEC2ContainerRegistryPowerUser (ECRへのpush)
+#    - 以下のカスタムインラインポリシー (ECS + Scheduler 最小権限):
+#      {
+#        "Version": "2012-10-17",
+#        "Statement": [
+#          {
+#            "Effect": "Allow",
+#            "Action": ["ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition"],
+#            "Resource": "*"
+#          },
+#          {
+#            "Effect": "Allow",
+#            "Action": ["scheduler:GetSchedule", "scheduler:UpdateSchedule"],
+#            "Resource": "arn:aws:scheduler:<REGION>:<ACCOUNT_ID>:schedule/default/<EVENTBRIDGE_SCHEDULE_NAME>"
+#          }
+#        ]
+#      }
+#
+# 【ビルドコンテキストについて】
+# Dockerfile.batch は backend/ にあるが、ビルドコンテキストは notification/ を使用する
+# (Dockerfile.batch のコメント参照)
+
+name: Notification CI/CD
+
+on:
+  push:
+    paths:
+      - "notification/**"
+      - "backend/Dockerfile.batch"
+      - ".github/workflows/notification.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: notification
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: notification/go.mod
+          cache-dependency-path: notification/go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race ./...
+
+  build-and-push:
+    name: Build & Push to ECR
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      image-uri: ${{ steps.push.outputs.image-uri }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        id: push
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.ECR_REPOSITORY_NOTIFICATION }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # ビルドコンテキストは notification/、Dockerfileは backend/Dockerfile.batch
+          docker build \
+            --cache-from "$REGISTRY/$REPOSITORY:latest" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -f backend/Dockerfile.batch \
+            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
+            -t "$REGISTRY/$REPOSITORY:latest" \
+            ./notification
+
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:latest"
+
+          echo "image-uri=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy Notification Task
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Register new ECS task definition revision
+        id: register-task
+        env:
+          TASK_FAMILY: ${{ vars.ECS_NOTIFICATION_TASK_FAMILY }}
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$TASK_FAMILY" \
+            --query "taskDefinition" \
+            --output json)
+
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+            --arg IMAGE "$IMAGE_URI" \
+            '.containerDefinitions[0].image = $IMAGE
+             | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                   .compatibilities, .registeredAt, .registeredBy)')
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "task-definition-arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
+          echo "Registered: $NEW_ARN"
+
+      - name: Update EventBridge Scheduler to use new task definition
+        env:
+          SCHEDULE_NAME: ${{ vars.EVENTBRIDGE_SCHEDULE_NAME }}
+          NEW_TASK_DEF_ARN: ${{ steps.register-task.outputs.task-definition-arn }}
+        run: |
+          SCHEDULE=$(aws scheduler get-schedule --name "$SCHEDULE_NAME" --output json)
+
+          UPDATED_TARGET=$(echo "$SCHEDULE" | jq \
+            --arg ARN "$NEW_TASK_DEF_ARN" \
+            '.Target.EcsParameters.TaskDefinitionArn = $ARN | .Target')
+
+          aws scheduler update-schedule \
+            --name "$SCHEDULE_NAME" \
+            --schedule-expression "$(echo "$SCHEDULE" | jq -r '.ScheduleExpression')" \
+            --schedule-expression-timezone "$(echo "$SCHEDULE" | jq -r '.ScheduleExpressionTimezone')" \
+            --flexible-time-window "$(echo "$SCHEDULE" | jq '.FlexibleTimeWindow')" \
+            --target "$UPDATED_TARGET"
+
+          echo "Notification deploy succeeded!"

@@ -3,6 +3,13 @@ resource "aws_security_group" "alb" {
   vpc_id = aws_vpc.main.id
 
   ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -48,14 +55,15 @@ resource "aws_security_group" "rds" {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id, aws_security_group.lambda.id]
+    security_groups = [aws_security_group.ecs.id, aws_security_group.notification.id]
   }
 
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-rds-sg" })
 }
 
-resource "aws_security_group" "lambda" {
-  name   = "${local.name_prefix}-lambda-sg"
+# 通知バッチタスク用SG: アウトバウンドのみ (RDS・SES・CloudWatch Logs)
+resource "aws_security_group" "notification" {
+  name   = "${local.name_prefix}-notification-sg"
   vpc_id = aws_vpc.main.id
 
   egress {
@@ -65,5 +73,5 @@ resource "aws_security_group" "lambda" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(local.common_tags, { Name = "${local.name_prefix}-lambda-sg" })
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-notification-sg" })
 }

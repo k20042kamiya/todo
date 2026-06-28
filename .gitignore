@@ -1,5 +1,13 @@
 # Secrets & credentials
 backend/*adminsdk*.json
+*.tfvars
+!*.tfvars.example
+
+# Terraform state (contains plaintext secrets — never commit)
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform/
+terraform/.terraform.lock.hcl
 
 # Environment variables
 .env
@@ -8,7 +16,7 @@ backend/*adminsdk*.json
 
 # Go
 backend/vendor/
-lambda/vendor/
+notification/vendor/
 *.exe
 *.test
 *.out

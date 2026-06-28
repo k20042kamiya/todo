@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"log"
 
 	"todo/shared/transaction"
 
@@ -26,7 +27,9 @@ func (tm *transactionManager) Do(ctx context.Context, fn func(ctx context.Contex
 
 	txCtx := context.WithValue(ctx, txKey{}, tx)
 	if err := fn(txCtx); err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback().Error; rbErr != nil {
+			log.Printf("[ERROR] transaction rollback failed: %v (original error: %v)", rbErr, err)
+		}
 		return err
 	}
 

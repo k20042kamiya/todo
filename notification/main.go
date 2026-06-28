@@ -6,15 +6,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/aws/aws-lambda-go/lambda"
-
-	"lambda/infrastructure/database"
-	"lambda/infrastructure/email"
-	infraRepo "lambda/infrastructure/repository"
-	"lambda/usecase"
+	"notification/infrastructure/database"
+	"notification/infrastructure/email"
+	infraRepo "notification/infrastructure/repository"
+	"notification/usecase"
 )
 
-func handler(ctx context.Context) error {
+func run(ctx context.Context) error {
 	db, err := database.NewDB()
 	if err != nil {
 		return fmt.Errorf("DB接続に失敗: %w", err)
@@ -45,5 +43,7 @@ func handler(ctx context.Context) error {
 }
 
 func main() {
-	lambda.Start(handler)
+	if err := run(context.Background()); err != nil {
+		log.Fatalf("エラー: %v", err)
+	}
 }

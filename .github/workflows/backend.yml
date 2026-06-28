@@ -2,11 +2,14 @@
 #
 # 【必要な GitHub Secrets / Variables】
 # Secrets:
-#   AWS_ROLE_ARN          - OIDC用IAMロールARN (例: arn:aws:iam::123456789:role/github-actions-role)
+#   AWS_ROLE_ARN           - OIDC用IAMロールARN (例: arn:aws:iam::123456789:role/github-actions-role)
 # Variables:
-#   AWS_REGION            - AWSリージョン (例: ap-northeast-1)
+#   AWS_REGION             - AWSリージョン (例: ap-northeast-1)
 #   ECR_REPOSITORY_BACKEND - ECRリポジトリ名 (例: todo-backend)
-#   EC2_INSTANCE_ID       - デプロイ先EC2インスタンスID (例: i-0123456789abcdef0)
+#   ECS_CLUSTER_NAME       - ECSクラスター名 (例: todo-cluster)
+#   ECS_SERVICE_NAME       - ECSサービス名 (例: todo-api)
+#   ECS_TASK_DEFINITION    - ECSタスク定義のfamily名 (例: todo-api)
+#   ECS_CONTAINER_NAME     - コンテナ名 (例: api)
 #
 # 【AWS側の事前設定】
 # 1. IAM OIDC プロバイダーを作成:
@@ -22,9 +25,10 @@
 #        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:ref:refs/heads/main"}
 #      }
 #    }
-# 3. IAMロールに付与するポリシー: AmazonEC2ContainerRegistryPowerUser, AmazonSSMFullAccess
-# 4. EC2インスタンスのIAMロールに付与するポリシー: AmazonSSMManagedInstanceCore, AmazonEC2ContainerRegistryReadOnly
-# 5. EC2インスタンスに /etc/todo/api.env を配置 (DB接続情報などの環境変数)
+# 3. IAMロールに付与するポリシー:
+#    - AmazonEC2ContainerRegistryPowerUser (ECRへのpush)
+#    - ecs:RegisterTaskDefinition, ecs:UpdateService, ecs:DescribeTaskDefinition, ecs:DescribeServices (ECSデプロイ)
+#    - iam:PassRole (ECSタスク実行ロールのpass)
 
 name: Backend CI/CD
 
@@ -104,7 +108,7 @@ jobs:
           echo "image-uri=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
   deploy:
-    name: Deploy to EC2
+    name: Deploy to ECS Fargate
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production  # GitHub Environmentsによる承認フロー
@@ -115,61 +119,27 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Deploy via SSM (SSH不要・セキュア)
+      - name: Download current task definition
         env:
-          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
-          IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
+          TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
         run: |
-          # jqでJSONを組み立てて変数展開の安全性を確保
-          PARAMS=$(jq -n \
-            --arg registry "$REGISTRY" \
-            --arg image_uri "$IMAGE_URI" \
-            --arg region "$AWS_REGION" \
-            '{commands: [
-              ("aws ecr get-login-password --region " + $region + " | docker login --username AWS --password-stdin " + $registry),
-              ("docker pull " + $image_uri),
-              "docker stop todo-api || true",
-              "docker rm todo-api || true",
-              ("docker run -d --name todo-api --restart unless-stopped -p 8080:8080 --env-file /etc/todo/api.env " + $image_uri),
-              "docker image prune -f"
-            ]}')
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_DEFINITION" \
+            --query taskDefinition \
+            > task-definition.json
 
-          COMMAND_ID=$(aws ssm send-command \
-            --region "$AWS_REGION" \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters "$PARAMS" \
-            --query "Command.CommandId" \
-            --output text)
+      - name: Update image in task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-def@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ vars.ECS_CONTAINER_NAME }}
+          image: ${{ needs.build-and-push.outputs.image-uri }}
 
-          echo "SSM Command ID: $COMMAND_ID"
-
-          # 完了まで待機 (最大20分)
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID"
-
-          # 実行結果の確認
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --query "Status" \
-            --output text)
-
-          if [ "$STATUS" != "Success" ]; then
-            echo "::error::Deploy failed (status: $STATUS)"
-            aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$INSTANCE_ID" \
-              --query "StandardErrorContent" \
-              --output text
-            exit 1
-          fi
-
-          echo "Deploy succeeded!"
+      - name: Deploy to ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-def@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ vars.ECS_SERVICE_NAME }}
+          cluster: ${{ vars.ECS_CLUSTER_NAME }}
+          wait-for-service-stability: true

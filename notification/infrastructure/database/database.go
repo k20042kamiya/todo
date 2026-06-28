@@ -19,7 +19,7 @@ func NewDB() (*gorm.DB, error) {
 		DBName:    os.Getenv("DB_NAME"),
 		Params:    map[string]string{"charset": "utf8mb4"},
 		ParseTime: true,
-		Loc:       time.Local,
+		Loc:       time.UTC,
 	}
 
 	db, err := gorm.Open(mysql.Open(cfg.FormatDSN()), &gorm.Config{
@@ -30,14 +30,6 @@ func NewDB() (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	return db, nil
 }

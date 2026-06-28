@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"lambda/domain/entity"
+	"notification/domain/entity"
 )
 
 type mockNotificationRepository struct {

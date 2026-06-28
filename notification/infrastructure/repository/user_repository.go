@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 
-	"lambda/domain/entity"
-	"lambda/domain/repository"
-	"lambda/infrastructure/database"
+	"notification/domain/entity"
+	"notification/domain/repository"
+	"notification/infrastructure/database"
 
 	"gorm.io/gorm"
 )

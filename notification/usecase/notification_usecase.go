@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"lambda/domain/entity"
-	"lambda/domain/repository"
+	"notification/domain/entity"
+	"notification/domain/repository"
 )
 
 type EmailSender interface {
@@ -43,13 +43,14 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 	}
 
 	now := time.Now()
+	today := now.UTC().Truncate(24 * time.Hour)
 	for _, todo := range todos {
 		if todo.DueDate == nil {
 			continue
 		}
 
-		dueDate := *todo.DueDate
-		daysUntilDue := time.Until(dueDate).Hours() / 24
+		dueDay := todo.DueDate.UTC().Truncate(24 * time.Hour)
+		daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 
 		if daysUntilDue < 0 {
 			if err := u.sendNotificationIfNeeded(ctx, todo, entity.NotificationTypeOverdue, now); err != nil {
@@ -79,11 +80,6 @@ func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo
 		return fmt.Errorf("ユーザー取得に失敗: userID=%d, %w", todo.UserID, err)
 	}
 
-	subject, body := u.buildEmailContent(todo, notifType)
-	if err := u.emailSender.Send(ctx, user.Email, subject, body); err != nil {
-		return fmt.Errorf("メール送信に失敗: %w", err)
-	}
-
 	notification := &entity.Notification{
 		TodoID: todo.ID,
 		UserID: todo.UserID,
@@ -91,6 +87,11 @@ func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo
 	}
 	if err := u.notificationRepo.Create(ctx, notification); err != nil {
 		return fmt.Errorf("通知レコード作成に失敗: %w", err)
+	}
+
+	subject, body := u.buildEmailContent(todo, notifType)
+	if err := u.emailSender.Send(ctx, user.Email, subject, body); err != nil {
+		return fmt.Errorf("メール送信に失敗: to=%s, %w", user.Email, err)
 	}
 
 	log.Printf("[INFO] 通知送信完了: todoID=%d, type=%s, userEmail=%s", todo.ID, notifType, user.Email)

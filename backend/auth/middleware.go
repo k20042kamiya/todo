@@ -37,6 +37,11 @@ func Auth(authClient *firebaseauth.Client, userUsecase userpkg.Usecase) echo.Mid
 			}
 
 			email, _ := token.Claims["email"].(string)
+			if email == "" {
+				return c.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "Email is required",
+				})
+			}
 			name, _ := token.Claims["name"].(string)
 
 			user, err := userUsecase.FindOrCreateByFirebaseUID(c.Request().Context(), token.UID, email, name)
