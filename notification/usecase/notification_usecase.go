@@ -2,8 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"notification/domain/entity"
@@ -52,49 +53,67 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 		dueDay := todo.DueDate.UTC().Truncate(24 * time.Hour)
 		daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 
-		if daysUntilDue < 0 {
-			if err := u.sendNotificationIfNeeded(ctx, todo, entity.NotificationTypeOverdue, now); err != nil {
-				log.Printf("[WARN] overdue通知送信に失敗: todoID=%d, error=%v", todo.ID, err)
-			}
-		} else if daysUntilDue <= 3 {
-			if err := u.sendNotificationIfNeeded(ctx, todo, entity.NotificationTypeApproaching, now); err != nil {
-				log.Printf("[WARN] approaching通知送信に失敗: todoID=%d, error=%v", todo.ID, err)
-			}
+		var notifType string
+		switch {
+		case daysUntilDue < 0:
+			notifType = entity.NotificationTypeOverdue
+		case daysUntilDue <= 3:
+			notifType = entity.NotificationTypeApproaching
+		default:
+			continue
+		}
+
+		if err := u.sendNotificationIfNeeded(ctx, todo, notifType); err != nil {
+			return fmt.Errorf("致命的エラーのため処理を中断: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo *entity.Todo, notifType string, now time.Time) error {
+func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo *entity.Todo, notifType string) error {
+	// 重複確認: DBエラー時は安全側（重複送信を避けるため）スキップ
 	existing, err := u.notificationRepo.FindByTodoIDAndType(ctx, todo.ID, notifType)
 	if err != nil {
-		return fmt.Errorf("通知重複チェックに失敗: %w", err)
+		slog.WarnContext(ctx, "重複チェック失敗のためスキップ（安全側）", "todo_id", todo.ID, "error", err)
+		return nil
 	}
 	if existing != nil {
 		return nil
 	}
 
+	// ユーザー取得
 	user, err := u.userRepo.FindByID(ctx, todo.UserID)
 	if err != nil {
-		return fmt.Errorf("ユーザー取得に失敗: userID=%d, %w", todo.UserID, err)
+		if errors.Is(err, entity.ErrNotFound) {
+			slog.WarnContext(ctx, "通知対象ユーザーが存在しないためスキップ", "todo_id", todo.ID, "user_id", todo.UserID)
+			return nil
+		}
+		slog.WarnContext(ctx, "ユーザー取得に失敗", "todo_id", todo.ID, "user_id", todo.UserID, "error", err)
+		return nil
 	}
 
+	// メール送信（先に送信してから記録する）
+	subject, body := u.buildEmailContent(todo, notifType)
+	if err := u.emailSender.Send(ctx, user.Email, subject, body); err != nil {
+		if errors.Is(err, entity.ErrInvalidRecipient) {
+			slog.WarnContext(ctx, "メール送信失敗（無効な宛先）", "todo_id", todo.ID, "to", user.Email, "error", err)
+			return nil
+		}
+		return fmt.Errorf("SESサービスエラー: todoID=%d, to=%s, %w", todo.ID, user.Email, err)
+	}
+
+	// 通知レコード保存（メール送信成功後）
 	notification := &entity.Notification{
 		TodoID: todo.ID,
 		UserID: todo.UserID,
 		Type:   notifType,
 	}
 	if err := u.notificationRepo.Create(ctx, notification); err != nil {
-		return fmt.Errorf("通知レコード作成に失敗: %w", err)
+		slog.ErrorContext(ctx, "通知レコード保存失敗（メールは送信済み）", "todo_id", todo.ID, "error", err)
 	}
 
-	subject, body := u.buildEmailContent(todo, notifType)
-	if err := u.emailSender.Send(ctx, user.Email, subject, body); err != nil {
-		return fmt.Errorf("メール送信に失敗: to=%s, %w", user.Email, err)
-	}
-
-	log.Printf("[INFO] 通知送信完了: todoID=%d, type=%s, userEmail=%s", todo.ID, notifType, user.Email)
+	slog.InfoContext(ctx, "通知送信完了", "todo_id", todo.ID, "type", notifType, "to", user.Email)
 	return nil
 }
 

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"notification/infrastructure/database"
@@ -12,7 +12,14 @@ import (
 	"notification/usecase"
 )
 
-func run(ctx context.Context) error {
+func run(ctx context.Context) (retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "unexpected panic", "panic", r)
+			retErr = fmt.Errorf("unexpected panic: %v", r)
+		}
+	}()
+
 	db, err := database.NewDB()
 	if err != nil {
 		return fmt.Errorf("DB接続に失敗: %w", err)
@@ -38,12 +45,14 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("通知送信に失敗: %w", err)
 	}
 
-	log.Println("通知バッチ処理が完了しました")
+	slog.InfoContext(ctx, "通知バッチ処理が完了しました")
 	return nil
 }
 
 func main() {
-	if err := run(context.Background()); err != nil {
-		log.Fatalf("エラー: %v", err)
+	ctx := context.Background()
+	if err := run(ctx); err != nil {
+		slog.ErrorContext(ctx, "バッチ処理が失敗しました", "error", err)
+		os.Exit(1)
 	}
 }

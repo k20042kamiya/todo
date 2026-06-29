@@ -2,7 +2,10 @@ package email
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"notification/domain/entity"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -48,6 +51,10 @@ func (s *SesSender) Send(ctx context.Context, to, subject, body string) error {
 	}
 
 	if _, err := s.client.SendEmail(ctx, input); err != nil {
+		var msgRejected *types.MessageRejected
+		if errors.As(err, &msgRejected) {
+			return fmt.Errorf("%w: %v", entity.ErrInvalidRecipient, err)
+		}
 		return fmt.Errorf("SESメール送信に失敗: %w", err)
 	}
 
