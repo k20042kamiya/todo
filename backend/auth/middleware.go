@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -37,11 +37,16 @@ func Auth(authClient *firebaseauth.Client, userUsecase userpkg.Usecase) echo.Mid
 			}
 
 			email, _ := token.Claims["email"].(string)
+			if email == "" {
+				return c.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "Email is required",
+				})
+			}
 			name, _ := token.Claims["name"].(string)
 
 			user, err := userUsecase.FindOrCreateByFirebaseUID(c.Request().Context(), token.UID, email, name)
 			if err != nil {
-				log.Printf("[ERROR] FindOrCreateByFirebaseUID failed: uid=%s, error=%v", token.UID, err)
+				slog.ErrorContext(c.Request().Context(), "FindOrCreateByFirebaseUID failed", "uid", token.UID, "error", err)
 				return c.JSON(http.StatusInternalServerError, map[string]string{
 					"error": "Internal server error",
 				})

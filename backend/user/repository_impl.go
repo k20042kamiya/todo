@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"todo/infrastructure/database"
+	apperrors "todo/shared/errors"
 
 	"gorm.io/gorm"
 )
@@ -23,7 +25,10 @@ func (r *repository) getDB(ctx context.Context) *gorm.DB {
 func (r *repository) FindByID(ctx context.Context, id int) (*User, error) {
 	var user User
 	if err := r.getDB(ctx).Where("id = ?", id).First(&user).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(apperrors.ErrCodeNotFound, "user not found")
+		}
+		return nil, apperrors.Wrap(apperrors.ErrCodeDatabase, "FindByID", err)
 	}
 	return &user, nil
 }
@@ -31,11 +36,17 @@ func (r *repository) FindByID(ctx context.Context, id int) (*User, error) {
 func (r *repository) FindByFirebaseUID(ctx context.Context, firebaseUID string) (*User, error) {
 	var user User
 	if err := r.getDB(ctx).Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(apperrors.ErrCodeNotFound, "user not found")
+		}
+		return nil, apperrors.Wrap(apperrors.ErrCodeDatabase, "FindByFirebaseUID", err)
 	}
 	return &user, nil
 }
 
 func (r *repository) Create(ctx context.Context, user *User) error {
-	return r.getDB(ctx).Create(user).Error
+	if err := r.getDB(ctx).Create(user).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrCodeDatabase, "Create user", err)
+	}
+	return nil
 }
