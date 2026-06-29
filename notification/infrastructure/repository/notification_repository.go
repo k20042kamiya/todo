@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"notification/domain/entity"
 	"notification/domain/repository"
@@ -23,9 +24,12 @@ func (r *notificationRepository) getDB(ctx context.Context) *gorm.DB {
 	return database.GetTx(ctx, r.db)
 }
 
-func (r *notificationRepository) FindByTodoIDAndType(ctx context.Context, todoID int, notifType string) (*entity.Notification, error) {
+func (r *notificationRepository) FindTodayByTodoID(ctx context.Context, todoID int) (*entity.Notification, error) {
 	var notification entity.Notification
-	err := r.getDB(ctx).Where("todo_id = ? AND type = ?", todoID, notifType).First(&notification).Error
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	err := r.getDB(ctx).
+		Where("todo_id = ? AND sent_at >= ?", todoID, today).
+		First(&notification).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -39,13 +43,3 @@ func (r *notificationRepository) Create(ctx context.Context, notification *entit
 	return r.getDB(ctx).Create(notification).Error
 }
 
-func (r *notificationRepository) FindUncompletedTodosWithDueDate(ctx context.Context) ([]*entity.Todo, error) {
-	var todos []*entity.Todo
-	err := r.getDB(ctx).
-		Where("is_completed = ? AND due_date IS NOT NULL", false).
-		Find(&todos).Error
-	if err != nil {
-		return nil, err
-	}
-	return todos, nil
-}

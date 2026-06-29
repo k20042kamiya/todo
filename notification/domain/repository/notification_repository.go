@@ -7,7 +7,6 @@ import (
 )
 
 type NotificationRepository interface {
-	FindByTodoIDAndType(ctx context.Context, todoID int, notifType string) (*entity.Notification, error)
+	FindTodayByTodoID(ctx context.Context, todoID int) (*entity.Notification, error)
 	Create(ctx context.Context, notification *entity.Notification) error
-	FindUncompletedTodosWithDueDate(ctx context.Context) ([]*entity.Todo, error)
 }
