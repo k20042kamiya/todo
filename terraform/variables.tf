@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "domain_name" {
   description = "Root domain name"
   type        = string
-  default     = "todo-app.dev"
+  default     = "tod-oapp.com"
 }
 
 variable "db_name" {
@@ -31,10 +31,22 @@ variable "db_password" {
 variable "ses_sender_email" {
   description = "SES verified sender email address"
   type        = string
-  default     = "noreply@todo-app.dev"
+  default     = "noreply@tod-oapp.com"
 }
 
 variable "firebase_project_id" {
   description = "Firebase project ID"
   type        = string
+}
+
+variable "firebase_service_account_json" {
+  description = "Firebase Admin SDK service account JSON (content of the JSON file)"
+  type        = string
+  sensitive   = true
+}
+
+variable "create_rds" {
+  description = "RDSインスタンスを作成するか (false=後回し、true=作成)"
+  type        = bool
+  default     = false
 }
