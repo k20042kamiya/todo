@@ -21,24 +21,27 @@ type NotificationUsecase interface {
 
 type notificationUsecase struct {
 	notificationRepo repository.NotificationRepository
+	todoRepo         repository.TodoRepository
 	userRepo         repository.UserRepository
 	emailSender      EmailSender
 }
 
 func NewNotificationUsecase(
 	notificationRepo repository.NotificationRepository,
+	todoRepo repository.TodoRepository,
 	userRepo repository.UserRepository,
 	emailSender EmailSender,
 ) NotificationUsecase {
 	return &notificationUsecase{
 		notificationRepo: notificationRepo,
+		todoRepo:         todoRepo,
 		userRepo:         userRepo,
 		emailSender:      emailSender,
 	}
 }
 
 func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) error {
-	todos, err := u.notificationRepo.FindUncompletedTodosWithDueDate(ctx)
+	todos, err := u.todoRepo.FindUncompletedTodosWithDueDate(ctx)
 	if err != nil {
 		return fmt.Errorf("未完了Todo取得に失敗: %w", err)
 	}
@@ -73,7 +76,7 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 
 func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo *entity.Todo, notifType string) error {
 	// 重複確認: DBエラー時は安全側（重複送信を避けるため）スキップ
-	existing, err := u.notificationRepo.FindByTodoIDAndType(ctx, todo.ID, notifType)
+	existing, err := u.notificationRepo.FindTodayByTodoID(ctx, todo.ID)
 	if err != nil {
 		slog.WarnContext(ctx, "重複チェック失敗のためスキップ（安全側）", "todo_id", todo.ID, "error", err)
 		return nil
