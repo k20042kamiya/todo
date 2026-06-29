@@ -1,6 +1,7 @@
 package todo
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -11,6 +12,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 )
+
+type DateOnly struct{ time.Time }
+
+func (d DateOnly) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Format("2006-01-02"))
+}
 
 type Handler struct {
 	usecase Usecase
@@ -38,7 +45,7 @@ type TodoResponse struct {
 	UserID      int        `json:"user_id"`
 	Title       string     `json:"title"`
 	Content     *string    `json:"content"`
-	DueDate     *time.Time `json:"due_date"`
+	DueDate     *DateOnly  `json:"due_date"`
 	IsCompleted bool       `json:"is_completed"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
@@ -49,12 +56,17 @@ type TodoListResponse struct {
 }
 
 func toResponse(todo *Todo) *TodoResponse {
+	var dueDate *DateOnly
+	if todo.DueDate != nil {
+		d := DateOnly{*todo.DueDate}
+		dueDate = &d
+	}
 	return &TodoResponse{
 		ID:          todo.ID,
 		UserID:      todo.UserID,
 		Title:       todo.Title,
 		Content:     todo.Content,
-		DueDate:     todo.DueDate,
+		DueDate:     dueDate,
 		IsCompleted: todo.IsCompleted,
 		CreatedAt:   todo.CreatedAt,
 		UpdatedAt:   todo.UpdatedAt,
