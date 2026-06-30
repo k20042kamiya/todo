@@ -209,8 +209,8 @@ daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 
 | 種別 | 件名 | 本文 |
 |------|------|------|
-| approaching | `【期日間近】{title}` | `TODOの期日が近づいています。\nタイトル: {title}\n期日: {YYYY-MM-DD}\n期日までに完了してください。` |
-| overdue | `【期日超過】{title}` | `TODOの期日が過ぎています。\nタイトル: {title}\n期日: {YYYY-MM-DD}\n早急に対応してください。` |
+| approaching | `【期日間近】{title}` | `TODOの期日が近づいています。\nタイトル: {title}\n期日: {YYYY-MM-DD}\nTODOを確認する: {FRONTEND_URL}\n期日までに完了してください。` |
+| overdue | `【期日超過】{title}` | `TODOの期日が過ぎています。\nタイトル: {title}\n期日: {YYYY-MM-DD}\nTODOを確認する: {FRONTEND_URL}\n早急に対応してください。` |
 
 ---
 
@@ -317,6 +317,7 @@ daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 | `DB_NAME` | YES | データベース名 |
 | `SES_FROM_EMAIL` | YES | 送信元メールアドレス（SES検証済みであること） |
 | `AWS_REGION_NAME` | YES | AWSリージョン |
+| `FRONTEND_URL` | YES | メール本文に埋め込むフロントエンドURL（例: `https://tod-oapp.com`） |
 
 ---
 
