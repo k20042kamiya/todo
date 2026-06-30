@@ -20,11 +20,11 @@ output "ecr_repository_url" {
 
 output "rds_endpoint" {
   description = "RDSエンドポイント"
-  value       = aws_db_instance.main.address
+  value       = var.create_rds ? aws_db_instance.main[0].address : "RDS未作成"
   sensitive   = true
 }
 
-output "lambda_function_name" {
-  description = "Lambda関数名 (CI/CDでupdate-function-codeに使用)"
-  value       = aws_lambda_function.notification.function_name
+output "notification_ecr_repository_url" {
+  description = "通知バッチ用ECRリポジトリURL (CI/CDでdocker pushに使用)"
+  value       = aws_ecr_repository.notification.repository_url
 }

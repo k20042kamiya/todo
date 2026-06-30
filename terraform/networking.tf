@@ -23,7 +23,7 @@ resource "aws_subnet" "public" {
   tags              = merge(local.common_tags, { Name = "${local.name_prefix}-public-${count.index}" })
 }
 
-# プライベートサブネット: RDS / Lambda用 (2AZ必須)
+# プライベートサブネット: RDS用 (2AZ必須)
 resource "aws_subnet" "private" {
   count             = 2
   vpc_id            = aws_vpc.main.id

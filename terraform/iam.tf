@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # ECS実行ロール: ECRイメージ取得・CloudWatch Logs書き込み・SSMパラメータ取得
 resource "aws_iam_role" "ecs_execution" {
   name = "${local.name_prefix}-ecs-execution-role"
@@ -33,6 +35,20 @@ resource "aws_iam_role_policy" "ecs_execution_ssm" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_execution_secrets_manager" {
+  name = "secrets-manager-access"
+  role = aws_iam_role.ecs_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = [aws_secretsmanager_secret.firebase_service_account.arn]
+    }]
+  })
+}
+
 # ECSタスクロール: アプリケーションが実行時に使うAWS権限
 resource "aws_iam_role" "ecs_task" {
   name = "${local.name_prefix}-ecs-task-role"
@@ -49,15 +65,33 @@ resource "aws_iam_role" "ecs_task" {
   tags = local.common_tags
 }
 
-# Lambdaロール
-resource "aws_iam_role" "lambda" {
-  name = "${local.name_prefix}-lambda-role"
+# ECSタスクロールにSES送信権限を付与
+resource "aws_iam_role_policy" "ecs_task_ses" {
+  name = "ses-send"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action = ["ses:SendEmail", "ses:SendRawEmail"]
+      Resource = [
+        "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}",
+        "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/${var.ses_sender_email}",
+      ]
+    }]
+  })
+}
+
+# EventBridge Schedulerロール: ECS RunTaskを呼び出すために必要
+resource "aws_iam_role" "scheduler" {
+  name = "${local.name_prefix}-scheduler-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
+      Principal = { Service = "scheduler.amazonaws.com" }
       Action    = "sts:AssumeRole"
     }]
   })
@@ -65,36 +99,26 @@ resource "aws_iam_role" "lambda" {
   tags = local.common_tags
 }
 
-# VPC内Lambda実行に必要 (ENI作成権限含む)
-resource "aws_iam_role_policy_attachment" "lambda_vpc" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
-resource "aws_iam_role_policy" "lambda_ses" {
-  name = "ses-send"
-  role = aws_iam_role.lambda.id
+resource "aws_iam_role_policy" "scheduler_ecs" {
+  name = "ecs-run-task"
+  role = aws_iam_role.scheduler.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource = "*"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "lambda_ssm" {
-  name = "ssm-access"
-  role = aws_iam_role.lambda.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["ssm:GetParameter"]
-      Resource = [aws_ssm_parameter.db_password.arn]
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecs:RunTask"]
+        Resource = ["arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:task-definition/${aws_ecs_task_definition.notification.family}:*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = [
+          aws_iam_role.ecs_execution.arn,
+          aws_iam_role.ecs_task.arn,
+        ]
+      }
+    ]
   })
 }
