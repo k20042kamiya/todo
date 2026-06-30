@@ -137,7 +137,7 @@ jobs:
             --task-definition "$TASK_DEF_ARN" \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SECURITY_GROUP_ID],assignPublicIp=DISABLED}" \
-            --overrides "{\"containerOverrides\":[{\"name\":\"api\",\"image\":\"$IMAGE_URI\",\"command\":[\"./migrate\"]}]}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"api\",\"command\":[\"./migrate\"]}]}" \
             --query "tasks[0].taskArn" \
             --output text)
 
