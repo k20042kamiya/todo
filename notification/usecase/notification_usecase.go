@@ -77,25 +77,28 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 
 		slog.InfoContext(ctx, "通知判定", "todo_id", todo.ID, "type", notifType, "days_until_due", daysUntilDue)
 
-		if err := u.sendNotificationIfNeeded(ctx, todo, notifType); err != nil {
+		sent, err := u.sendNotificationIfNeeded(ctx, todo, notifType)
+		if err != nil {
 			return fmt.Errorf("致命的エラーのため処理を中断: %w", err)
 		}
-		sentCount++
+		if sent {
+			sentCount++
+		}
 	}
 
 	slog.InfoContext(ctx, "通知チェック完了", "sent", sentCount, "not_yet_due", notYetDueCount)
 	return nil
 }
 
-func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo *entity.Todo, notifType string) error {
+func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo *entity.Todo, notifType string) (bool, error) {
 	// 重複確認: DBエラー時は安全側（重複送信を避けるため）スキップ
 	existing, err := u.notificationRepo.FindTodayByTodoID(ctx, todo.ID)
 	if err != nil {
 		slog.WarnContext(ctx, "重複チェック失敗のためスキップ（安全側）", "todo_id", todo.ID, "error", err)
-		return nil
+		return false, nil
 	}
 	if existing != nil {
-		return nil
+		return false, nil
 	}
 
 	// ユーザー取得
@@ -103,10 +106,10 @@ func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo
 	if err != nil {
 		if errors.Is(err, entity.ErrNotFound) {
 			slog.WarnContext(ctx, "通知対象ユーザーが存在しないためスキップ", "todo_id", todo.ID, "user_id", todo.UserID)
-			return nil
+			return false, nil
 		}
 		slog.WarnContext(ctx, "ユーザー取得に失敗", "todo_id", todo.ID, "user_id", todo.UserID, "error", err)
-		return nil
+		return false, nil
 	}
 
 	// メール送信（先に送信してから記録する）
@@ -114,9 +117,9 @@ func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo
 	if err := u.emailSender.Send(ctx, user.Email, subject, body); err != nil {
 		if errors.Is(err, entity.ErrInvalidRecipient) {
 			slog.WarnContext(ctx, "メール送信失敗（無効な宛先）", "todo_id", todo.ID, "to", user.Email, "error", err)
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("SESサービスエラー: todoID=%d, to=%s, %w", todo.ID, user.Email, err)
+		return false, fmt.Errorf("SESサービスエラー: todoID=%d, to=%s, %w", todo.ID, user.Email, err)
 	}
 
 	// 通知レコード保存（メール送信成功後）
@@ -130,7 +133,7 @@ func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo
 	}
 
 	slog.InfoContext(ctx, "通知送信完了", "todo_id", todo.ID, "type", notifType, "to", user.Email)
-	return nil
+	return true, nil
 }
 
 func (u *notificationUsecase) buildEmailContent(todo *entity.Todo, notifType string) (subject, body string) {
