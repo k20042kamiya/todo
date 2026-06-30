@@ -1,5 +1,4 @@
-# ビルドコンテキストは notification/ ディレクトリを指定すること
-# docker build -f ../backend/Dockerfile.batch .
+# docker build -f Dockerfile.batch .
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app

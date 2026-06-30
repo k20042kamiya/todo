@@ -29,10 +29,6 @@
 #          }
 #        ]
 #      }
-#
-# 【ビルドコンテキストについて】
-# Dockerfile.batch は backend/ にあるが、ビルドコンテキストは notification/ を使用する
-# (Dockerfile.batch のコメント参照)
 
 name: Notification CI/CD
 
@@ -40,7 +36,6 @@ on:
   push:
     paths:
       - "notification/**"
-      - "backend/Dockerfile.batch"
       - ".github/workflows/notification.yml"
 
 permissions:
@@ -99,11 +94,10 @@ jobs:
           REPOSITORY: ${{ vars.ECR_REPOSITORY_NOTIFICATION }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # ビルドコンテキストは notification/、Dockerfileは backend/Dockerfile.batch
           docker build \
             --cache-from "$REGISTRY/$REPOSITORY:latest" \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            -f backend/Dockerfile.batch \
+            -f notification/Dockerfile.batch \
             -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
             -t "$REGISTRY/$REPOSITORY:latest" \
             ./notification
