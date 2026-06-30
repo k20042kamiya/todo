@@ -340,10 +340,20 @@ daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 ```json
 {
   "Statement": [
-    { "Effect": "Allow", "Action": ["ses:SendEmail"], "Resource": "*" }
+    {
+      "Effect": "Allow",
+      "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+      "Resource": [
+        "arn:aws:ses:{region}:{account_id}:identity/{domain_name}",
+        "arn:aws:ses:{region}:{account_id}:identity/{ses_sender_email}"
+      ]
+    }
   ]
 }
 ```
+
+- `ses:SendRawEmail` は現時点では未使用。将来の添付ファイル付きメール対応に備えて付与している
+- Resource はワイルドカード（`*`）を避け、送信元ドメインとメールアドレスに限定している
 
 ### EventBridgeスケジュール
 
