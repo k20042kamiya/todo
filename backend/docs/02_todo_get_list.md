@@ -75,7 +75,7 @@ GET /api/v1/todos
       "user_id": 1,
       "title": "買い物に行く",
       "content": "牛乳と卵を買う",
-      "due_date": "2025-01-31T00:00:00Z",
+      "due_date": "2025-01-31",
       "is_completed": false,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"

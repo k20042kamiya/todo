@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	apperrors "todo/shared/errors"
 )
 
 type mockTransactionManager struct{}
@@ -256,14 +258,15 @@ func TestUsecase_DeleteTodo(t *testing.T) {
 	content := "テスト内容"
 
 	tests := []struct {
-		name           string
-		userID         int
-		todoID         int
-		existingTodo   *Todo
-		findByIDError  error
-		deleteError    error
-		expectedError  bool
-		expectedErrMsg string
+		name            string
+		userID          int
+		todoID          int
+		existingTodo    *Todo
+		findByIDError   error
+		deleteError     error
+		expectedError   bool
+		expectedErrMsg  string
+		expectedErrCode apperrors.ErrorCode
 	}{
 		{
 			name:   "正常系: TODOを削除",
@@ -289,8 +292,9 @@ func TestUsecase_DeleteTodo(t *testing.T) {
 			existingTodo: &Todo{
 				ID: 1, UserID: 1, Title: "テストTODO", Content: &content, IsCompleted: false, CreatedAt: now, UpdatedAt: now,
 			},
-			expectedError:  true,
-			expectedErrMsg: "[FORBIDDEN] forbidden",
+			expectedError:   true,
+			expectedErrMsg:  "[FORBIDDEN] forbidden",
+			expectedErrCode: apperrors.ErrCodeForbidden,
 		},
 		{
 			name:   "異常系: 削除時にエラー",
@@ -302,6 +306,18 @@ func TestUsecase_DeleteTodo(t *testing.T) {
 			deleteError:    errors.New("database error"),
 			expectedError:  true,
 			expectedErrMsg: "database error",
+		},
+		{
+			name:   "異常系: TOCTOU - FindByID後に別トランザクションが先に削除（RowsAffected=0）",
+			userID: 1,
+			todoID: 1,
+			existingTodo: &Todo{
+				ID: 1, UserID: 1, Title: "テストTODO", Content: &content, IsCompleted: false, CreatedAt: now, UpdatedAt: now,
+			},
+			deleteError:     apperrors.New(apperrors.ErrCodeNotFound, "todo not found"),
+			expectedError:   true,
+			expectedErrMsg:  "[NOT_FOUND] todo not found",
+			expectedErrCode: apperrors.ErrCodeNotFound,
 		},
 	}
 
@@ -328,6 +344,9 @@ func TestUsecase_DeleteTodo(t *testing.T) {
 				}
 				if tt.expectedErrMsg != "" && err.Error() != tt.expectedErrMsg {
 					t.Errorf("expected error message %s, got %s", tt.expectedErrMsg, err.Error())
+				}
+				if tt.expectedErrCode != "" && apperrors.GetCode(err) != tt.expectedErrCode {
+					t.Errorf("expected error code %s, got %s", tt.expectedErrCode, apperrors.GetCode(err))
 				}
 			} else {
 				if err != nil {

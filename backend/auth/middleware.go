@@ -31,6 +31,7 @@ func Auth(authClient *firebaseauth.Client, userUsecase userpkg.Usecase) echo.Mid
 
 			token, err := authClient.VerifyIDToken(c.Request().Context(), tokenString)
 			if err != nil {
+				slog.WarnContext(c.Request().Context(), "VerifyIDToken failed", "error", err)
 				return c.JSON(http.StatusUnauthorized, map[string]string{
 					"error": "Invalid token",
 				})

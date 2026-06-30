@@ -56,8 +56,12 @@ func (r *repository) Update(ctx context.Context, todo *Todo) error {
 }
 
 func (r *repository) Delete(ctx context.Context, id int, userID int) error {
-	if err := r.getDB(ctx).Where("user_id = ?", userID).Delete(&Todo{ID: id}).Error; err != nil {
-		return apperrors.Wrap(apperrors.ErrCodeDatabase, "Delete todo", err)
+	result := r.getDB(ctx).Where("user_id = ?", userID).Delete(&Todo{ID: id})
+	if result.Error != nil {
+		return apperrors.Wrap(apperrors.ErrCodeDatabase, "Delete todo", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return apperrors.New(apperrors.ErrCodeNotFound, "todo not found")
 	}
 	return nil
 }
