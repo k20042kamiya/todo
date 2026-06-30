@@ -243,6 +243,19 @@ func TestHandler_UpdateTodo(t *testing.T) {
 			expectedStatus: http.StatusOK,
 		},
 		{
+			name:        "正常系: due_dateをYYYY-MM-DD形式で更新",
+			todoID:      "1",
+			requestBody: `{"title":"更新","due_date":"2026-06-30","is_completed":false}`,
+			mockReturn:  &Todo{ID: 1, UserID: 1, Title: "更新", IsCompleted: false, CreatedAt: now, UpdatedAt: now},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "異常系: due_dateがISO 8601形式",
+			todoID:         "1",
+			requestBody:    `{"title":"更新","due_date":"2026-06-30T00:00:00Z","is_completed":false}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
 			name:           "異常系: タイトルが空",
 			todoID:         "1",
 			requestBody:    `{"title":"","content":"テスト内容"}`,
@@ -407,6 +420,43 @@ func TestHandler_DeleteTodo_Unauthorized(t *testing.T) {
 	}
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
+func TestDateOnly_MarshalJSON(t *testing.T) {
+	d := DateOnly{time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)}
+	b, err := json.Marshal(d)
+	if err != nil {
+		t.Fatalf("MarshalJSON failed: %v", err)
+	}
+	if string(b) != `"2026-06-30"` {
+		t.Errorf("expected %q, got %q", `"2026-06-30"`, string(b))
+	}
+}
+
+func TestDateOnly_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		wantDay int
+	}{
+		{"正常系: YYYY-MM-DD形式", `"2026-06-30"`, false, 30},
+		{"異常系: ISO 8601形式は不可", `"2026-06-30T00:00:00Z"`, true, 0},
+		{"異常系: 不正な文字列", `"not-a-date"`, true, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var d DateOnly
+			err := json.Unmarshal([]byte(tt.input), &d)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+			if !tt.wantErr && d.Day() != tt.wantDay {
+				t.Errorf("expected day %d, got %d", tt.wantDay, d.Day())
+			}
+		})
 	}
 }
 

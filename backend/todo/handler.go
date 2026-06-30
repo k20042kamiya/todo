@@ -19,6 +19,27 @@ func (d DateOnly) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Format("2006-01-02"))
 }
 
+func dateOnlyToTime(d *DateOnly) *time.Time {
+	if d == nil {
+		return nil
+	}
+	t := d.Time
+	return &t
+}
+
+func (d *DateOnly) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return err
+	}
+	d.Time = t
+	return nil
+}
+
 type Handler struct {
 	usecase Usecase
 }
@@ -28,16 +49,16 @@ func NewHandler(usecase Usecase) *Handler {
 }
 
 type createTodoRequest struct {
-	Title   string     `json:"title"`
-	Content *string    `json:"content"`
-	DueDate *time.Time `json:"due_date"`
+	Title   string    `json:"title"`
+	Content *string   `json:"content"`
+	DueDate *DateOnly `json:"due_date"`
 }
 
 type updateTodoRequest struct {
-	Title       string     `json:"title"`
-	Content     *string    `json:"content"`
-	DueDate     *time.Time `json:"due_date"`
-	IsCompleted bool       `json:"is_completed"`
+	Title       string    `json:"title"`
+	Content     *string   `json:"content"`
+	DueDate     *DateOnly `json:"due_date"`
+	IsCompleted bool      `json:"is_completed"`
 }
 
 type TodoResponse struct {
@@ -121,7 +142,7 @@ func (h *Handler) CreateTodo(c echo.Context) error {
 	todo, err := h.usecase.CreateTodo(ctx, userID, CreateInput{
 		Title:   req.Title,
 		Content: req.Content,
-		DueDate: req.DueDate,
+		DueDate: dateOnlyToTime(req.DueDate),
 	})
 	if err != nil {
 		code := apperrors.GetCode(err)
@@ -162,7 +183,7 @@ func (h *Handler) UpdateTodo(c echo.Context) error {
 	todo, err := h.usecase.UpdateTodo(ctx, userID, todoID, UpdateInput{
 		Title:       req.Title,
 		Content:     req.Content,
-		DueDate:     req.DueDate,
+		DueDate:     dateOnlyToTime(req.DueDate),
 		IsCompleted: req.IsCompleted,
 	})
 	if err != nil {

@@ -55,11 +55,11 @@ Authorization: Bearer {Firebase ID Token}
 
 ### 日時形式
 
-全ての日時はISO 8601形式（UTC）で返却する。
-
-```
-2025-01-31T00:00:00Z
-```
+| フィールド | 形式 | 例 |
+|-----------|------|-----|
+| `created_at` / `updated_at` | ISO 8601（UTC） | `"2025-01-31T00:00:00Z"` |
+| `due_date`（レスポンス） | `YYYY-MM-DD` | `"2025-01-31"` |
+| `due_date`（リクエスト） | `YYYY-MM-DD` | `"2025-01-31"` |
 
 ### HTTPステータスコード
 
@@ -126,7 +126,7 @@ GET /api/v1/todos
       "user_id": 1,
       "title": "買い物に行く",
       "content": "牛乳と卵を買う",
-      "due_date": "2025-01-31T00:00:00Z",
+      "due_date": "2025-01-31",
       "is_completed": false,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
@@ -166,7 +166,7 @@ POST /api/v1/todos
 {
   "title": "買い物に行く",
   "content": "牛乳と卵を買う",
-  "due_date": "2025-01-31T00:00:00Z"
+  "due_date": "2025-01-31"
 }
 ```
 
@@ -176,7 +176,7 @@ POST /api/v1/todos
 |------------|-----|------|------|------|
 | `title` | string | YES | 最大100文字 | タイトル |
 | `content` | string | NO | - | 内容（nullを許容） |
-| `due_date` | string (ISO 8601) | NO | - | 期日（nullを許容） |
+| `due_date` | string (YYYY-MM-DD) | NO | - | 期日（nullを許容） |
 
 **レスポンス** `201 Created`
 
@@ -186,7 +186,7 @@ POST /api/v1/todos
   "user_id": 1,
   "title": "買い物に行く",
   "content": "牛乳と卵を買う",
-  "due_date": "2025-01-31T00:00:00Z",
+  "due_date": "2025-01-31",
   "is_completed": false,
   "created_at": "2025-01-01T00:00:00Z",
   "updated_at": "2025-01-01T00:00:00Z"
@@ -236,7 +236,7 @@ PUT /api/v1/todos/:id
 |------------|-----|------|------|------|
 | `title` | string | YES | 最大100文字 | タイトル |
 | `content` | string | NO | - | 内容（nullを許容） |
-| `due_date` | string (ISO 8601) | NO | - | 期日（nullを許容） |
+| `due_date` | string (YYYY-MM-DD) | NO | - | 期日（nullを許容） |
 | `is_completed` | boolean | YES | - | 完了フラグ |
 
 **レスポンス** `200 OK`
@@ -309,7 +309,7 @@ type TodoResponse = {
   user_id: number;      // ユーザーID
   title: string;        // タイトル
   content: string | null; // 内容
-  due_date: string | null; // 期日 (ISO 8601)
+  due_date: string | null; // 期日 (YYYY-MM-DD)
   is_completed: boolean; // 完了フラグ
   created_at: string;   // 作成日時 (ISO 8601)
   updated_at: string;   // 更新日時 (ISO 8601)
