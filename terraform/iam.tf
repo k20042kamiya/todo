@@ -71,6 +71,16 @@ resource "aws_iam_role_policy" "github_actions_ecs" {
           aws_iam_role.ecs_execution.arn,
           aws_iam_role.ecs_task.arn,
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["scheduler:GetSchedule", "scheduler:UpdateSchedule"]
+        Resource = "arn:aws:scheduler:${var.aws_region}:${data.aws_caller_identity.current.account_id}:schedule/default/${local.name_prefix}-daily-notification"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = aws_iam_role.scheduler.arn
       }
     ]
   })
