@@ -41,13 +41,18 @@ func NewNotificationUsecase(
 }
 
 func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) error {
+	slog.InfoContext(ctx, "通知チェック開始")
+
 	todos, err := u.todoRepo.FindUncompletedTodosWithDueDate(ctx)
 	if err != nil {
 		return fmt.Errorf("未完了Todo取得に失敗: %w", err)
 	}
+	slog.InfoContext(ctx, "通知対象Todo取得完了", "count", len(todos))
 
 	now := time.Now()
 	today := now.UTC().Truncate(24 * time.Hour)
+	sentCount := 0
+	skippedCount := 0
 	for _, todo := range todos {
 		if todo.DueDate == nil {
 			continue
@@ -63,14 +68,19 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 		case daysUntilDue <= 3:
 			notifType = entity.NotificationTypeApproaching
 		default:
+			skippedCount++
 			continue
 		}
+
+		slog.InfoContext(ctx, "通知判定", "todo_id", todo.ID, "type", notifType, "days_until_due", daysUntilDue)
 
 		if err := u.sendNotificationIfNeeded(ctx, todo, notifType); err != nil {
 			return fmt.Errorf("致命的エラーのため処理を中断: %w", err)
 		}
+		sentCount++
 	}
 
+	slog.InfoContext(ctx, "通知チェック完了", "sent", sentCount, "skipped", skippedCount)
 	return nil
 }
 
