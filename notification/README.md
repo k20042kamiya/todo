@@ -261,7 +261,7 @@ stateDiagram-v2
 | 1 | 起動 | DB接続失敗 | RDS障害・ネットワーク障害・認証情報誤り |
 | 2 | 起動 | SESクライアント初期化失敗 | IAMロール不足・AWS設定誤り |
 | 3 | TODO取得 | `FindUncompletedTodosWithDueDate` 失敗 | DB接続断・クエリエラー |
-| 4 | 重複確認 | `FindByTodoIDAndType` 失敗 | DB接続断 |
+| 4 | 重複確認 | `FindTodayByTodoID` 失敗 | DB接続断 |
 | 5 | ユーザー取得 | `FindByID` 失敗（NOT FOUND） | TODOのUserIDに対応するユーザーが論理削除済み |
 | 6 | ユーザー取得 | `FindByID` 失敗（DBエラー） | DB接続断・クエリエラー |
 | 7 | メール送信 | `emailSender.Send` 失敗（個別） | 無効なメールアドレス・SESサンドボックス制限 |
@@ -354,7 +354,7 @@ stateDiagram-v2
 | `DB_PORT` | YES | MySQLポート（3306） |
 | `DB_NAME` | YES | データベース名 |
 | `SES_FROM_EMAIL` | YES | 送信元メールアドレス（SES検証済みであること） |
-| `AWS_REGION_NAME` | YES | AWSリージョン |
+| `AWS_DEFAULT_REGION` | YES | AWSリージョン |
 | `FRONTEND_URL` | YES | メール本文に埋め込むフロントエンドURL（例: `https://tod-oapp.com`） |
 
 ---
