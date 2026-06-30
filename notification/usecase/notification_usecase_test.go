@@ -9,20 +9,23 @@ import (
 )
 
 type mockNotificationRepository struct {
-	findByTodoIDAndTypeFunc            func(ctx context.Context, todoID int, notifType string) (*entity.Notification, error)
-	createFunc                         func(ctx context.Context, notification *entity.Notification) error
-	findUncompletedTodosWithDueDateFunc func(ctx context.Context) ([]*entity.Todo, error)
+	findTodayByTodoIDFunc func(ctx context.Context, todoID int) (*entity.Notification, error)
+	createFunc            func(ctx context.Context, notification *entity.Notification) error
 }
 
-func (m *mockNotificationRepository) FindByTodoIDAndType(ctx context.Context, todoID int, notifType string) (*entity.Notification, error) {
-	return m.findByTodoIDAndTypeFunc(ctx, todoID, notifType)
+func (m *mockNotificationRepository) FindTodayByTodoID(ctx context.Context, todoID int) (*entity.Notification, error) {
+	return m.findTodayByTodoIDFunc(ctx, todoID)
 }
 
 func (m *mockNotificationRepository) Create(ctx context.Context, notification *entity.Notification) error {
 	return m.createFunc(ctx, notification)
 }
 
-func (m *mockNotificationRepository) FindUncompletedTodosWithDueDate(ctx context.Context) ([]*entity.Todo, error) {
+type mockTodoRepository struct {
+	findUncompletedTodosWithDueDateFunc func(ctx context.Context) ([]*entity.Todo, error)
+}
+
+func (m *mockTodoRepository) FindUncompletedTodosWithDueDate(ctx context.Context) ([]*entity.Todo, error) {
 	return m.findUncompletedTodosWithDueDateFunc(ctx)
 }
 
@@ -52,15 +55,18 @@ func TestCheckAndSendNotifications_Approaching(t *testing.T) {
 	var sentEmail struct{ to, subject, body string }
 
 	notifRepo := &mockNotificationRepository{
-		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
-			return todos, nil
-		},
-		findByTodoIDAndTypeFunc: func(ctx context.Context, todoID int, notifType string) (*entity.Notification, error) {
+		findTodayByTodoIDFunc: func(ctx context.Context, todoID int) (*entity.Notification, error) {
 			return nil, nil
 		},
 		createFunc: func(ctx context.Context, notification *entity.Notification) error {
 			createdNotification = notification
 			return nil
+		},
+	}
+
+	todoRepo := &mockTodoRepository{
+		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
+			return todos, nil
 		},
 	}
 
@@ -79,7 +85,7 @@ func TestCheckAndSendNotifications_Approaching(t *testing.T) {
 		},
 	}
 
-	uc := NewNotificationUsecase(notifRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,15 +110,18 @@ func TestCheckAndSendNotifications_Overdue(t *testing.T) {
 	var createdNotification *entity.Notification
 
 	notifRepo := &mockNotificationRepository{
-		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
-			return todos, nil
-		},
-		findByTodoIDAndTypeFunc: func(ctx context.Context, todoID int, notifType string) (*entity.Notification, error) {
+		findTodayByTodoIDFunc: func(ctx context.Context, todoID int) (*entity.Notification, error) {
 			return nil, nil
 		},
 		createFunc: func(ctx context.Context, notification *entity.Notification) error {
 			createdNotification = notification
 			return nil
+		},
+	}
+
+	todoRepo := &mockTodoRepository{
+		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
+			return todos, nil
 		},
 	}
 
@@ -128,7 +137,7 @@ func TestCheckAndSendNotifications_Overdue(t *testing.T) {
 		},
 	}
 
-	uc := NewNotificationUsecase(notifRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,11 +159,8 @@ func TestCheckAndSendNotifications_DuplicateSkip(t *testing.T) {
 	createCalled := false
 
 	notifRepo := &mockNotificationRepository{
-		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
-			return todos, nil
-		},
-		findByTodoIDAndTypeFunc: func(ctx context.Context, todoID int, notifType string) (*entity.Notification, error) {
-			return &entity.Notification{ID: 1, TodoID: todoID, UserID: 1, Type: notifType}, nil
+		findTodayByTodoIDFunc: func(ctx context.Context, todoID int) (*entity.Notification, error) {
+			return &entity.Notification{ID: 1, TodoID: todoID, UserID: 1, Type: entity.NotificationTypeOverdue}, nil
 		},
 		createFunc: func(ctx context.Context, notification *entity.Notification) error {
 			createCalled = true
@@ -162,10 +168,16 @@ func TestCheckAndSendNotifications_DuplicateSkip(t *testing.T) {
 		},
 	}
 
+	todoRepo := &mockTodoRepository{
+		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
+			return todos, nil
+		},
+	}
+
 	userRepo := &mockUserRepository{}
 	emailSender := &mockEmailSender{}
 
-	uc := NewNotificationUsecase(notifRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,19 +195,22 @@ func TestCheckAndSendNotifications_NoDueDate(t *testing.T) {
 	createCalled := false
 
 	notifRepo := &mockNotificationRepository{
-		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
-			return todos, nil
-		},
 		createFunc: func(ctx context.Context, notification *entity.Notification) error {
 			createCalled = true
 			return nil
 		},
 	}
 
+	todoRepo := &mockTodoRepository{
+		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
+			return todos, nil
+		},
+	}
+
 	userRepo := &mockUserRepository{}
 	emailSender := &mockEmailSender{}
 
-	uc := NewNotificationUsecase(notifRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -214,19 +229,22 @@ func TestCheckAndSendNotifications_FarFutureDueDate(t *testing.T) {
 	createCalled := false
 
 	notifRepo := &mockNotificationRepository{
-		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
-			return todos, nil
-		},
 		createFunc: func(ctx context.Context, notification *entity.Notification) error {
 			createCalled = true
 			return nil
 		},
 	}
 
+	todoRepo := &mockTodoRepository{
+		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
+			return todos, nil
+		},
+	}
+
 	userRepo := &mockUserRepository{}
 	emailSender := &mockEmailSender{}
 
-	uc := NewNotificationUsecase(notifRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
