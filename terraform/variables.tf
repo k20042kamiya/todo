@@ -44,9 +44,3 @@ variable "firebase_service_account_json" {
   type        = string
   sensitive   = true
 }
-
-variable "create_rds" {
-  description = "RDSインスタンスを作成するか (false=後回し、true=作成)"
-  type        = bool
-  default     = false
-}

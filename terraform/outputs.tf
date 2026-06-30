@@ -20,7 +20,7 @@ output "ecr_repository_url" {
 
 output "rds_endpoint" {
   description = "RDSエンドポイント"
-  value       = var.create_rds ? aws_db_instance.main[0].address : "RDS未作成"
+  value       = aws_db_instance.main.address
   sensitive   = true
 }
 
