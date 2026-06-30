@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"log/slog"
 
 	apperrors "todo/shared/errors"
 )
@@ -22,6 +23,7 @@ func (u *usecase) FindOrCreateByFirebaseUID(ctx context.Context, firebaseUID, em
 	// 既存ユーザーは最初のFindで高速に返す（大多数のリクエスト）
 	user, err := u.repo.FindByFirebaseUID(ctx, firebaseUID)
 	if err == nil {
+		slog.InfoContext(ctx, "existing user found", "userID", user.ID, "firebaseUID", firebaseUID)
 		return user, nil
 	}
 	if apperrors.GetCode(err) != apperrors.ErrCodeNotFound {
@@ -41,6 +43,8 @@ func (u *usecase) FindOrCreateByFirebaseUID(ctx context.Context, firebaseUID, em
 	if err := u.repo.FindOrCreate(ctx, user); err != nil {
 		return nil, err
 	}
+
+	slog.InfoContext(ctx, "new user created", "userID", user.ID, "firebaseUID", firebaseUID)
 
 	return user, nil
 }
