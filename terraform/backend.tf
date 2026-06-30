@@ -97,6 +97,10 @@ resource "aws_ecs_service" "api" {
 
   depends_on = [aws_lb_listener.https]
   tags       = local.common_tags
+
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
 
 resource "aws_lb" "main" {
