@@ -109,7 +109,7 @@ resource "aws_iam_role_policy" "scheduler_ecs" {
       {
         Effect   = "Allow"
         Action   = ["ecs:RunTask"]
-        Resource = [aws_ecs_task_definition.notification.arn]
+        Resource = ["arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:task-definition/${aws_ecs_task_definition.notification.family}:*"]
       },
       {
         Effect   = "Allow"
