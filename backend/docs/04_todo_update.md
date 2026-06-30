@@ -47,7 +47,7 @@ PUT /api/v1/todos/:id
 {
   "title": "買い物に行く（更新）",
   "content": "牛乳と卵と野菜を買う",
-  "due_date": "2025-02-01T00:00:00Z",
+  "due_date": "2025-02-01",
   "is_completed": true
 }
 ```
@@ -56,7 +56,7 @@ PUT /api/v1/todos/:id
 |-----------|-----|------|------|------|
 | `title` | string | YES | 最大100文字 | タイトル |
 | `content` | string | NO | — | 内容（null 許容） |
-| `due_date` | string (ISO 8601) | NO | — | 期日（null 許容） |
+| `due_date` | string (YYYY-MM-DD) | NO | — | 期日（null 許容。ISO 8601 形式（時刻付き）は 400 エラー） |
 | `is_completed` | boolean | YES | — | 完了フラグ |
 
 ---
@@ -126,7 +126,7 @@ DB トランザクションに起因する。クライアントに 5xx を返し
   "user_id": 1,
   "title": "買い物に行く（更新）",
   "content": "牛乳と卵と野菜を買う",
-  "due_date": "2025-02-01T00:00:00Z",
+  "due_date": "2025-02-01",
   "is_completed": true,
   "created_at": "2025-01-01T00:00:00Z",
   "updated_at": "2025-01-02T00:00:00Z"
