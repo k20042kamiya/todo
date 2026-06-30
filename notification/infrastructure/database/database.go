@@ -12,14 +12,15 @@ import (
 
 func NewDB() (*gorm.DB, error) {
 	cfg := mysqldrv.Config{
-		User:      os.Getenv("DB_USER"),
-		Passwd:    os.Getenv("DB_PASSWORD"),
-		Net:       "tcp",
-		Addr:      os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
-		DBName:    os.Getenv("DB_NAME"),
-		Params:    map[string]string{"charset": "utf8mb4"},
-		ParseTime: true,
-		Loc:       time.UTC,
+		User:                 os.Getenv("DB_USER"),
+		Passwd:               os.Getenv("DB_PASSWORD"),
+		Net:                  "tcp",
+		Addr:                 os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
+		DBName:               os.Getenv("DB_NAME"),
+		Params:               map[string]string{"charset": "utf8mb4"},
+		ParseTime:            true,
+		Loc:                  time.UTC,
+		AllowNativePasswords: true,
 	}
 
 	db, err := gorm.Open(mysql.Open(cfg.FormatDSN()), &gorm.Config{

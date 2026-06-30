@@ -20,10 +20,13 @@ func run(ctx context.Context) (retErr error) {
 		}
 	}()
 
+	slog.InfoContext(ctx, "バッチ処理開始")
+
 	db, err := database.NewDB()
 	if err != nil {
 		return fmt.Errorf("DB接続に失敗: %w", err)
 	}
+	slog.InfoContext(ctx, "DB接続成功")
 
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -36,6 +39,7 @@ func run(ctx context.Context) (retErr error) {
 	if err != nil {
 		return fmt.Errorf("メール送信クライアント初期化に失敗: %w", err)
 	}
+	slog.InfoContext(ctx, "SESクライアント初期化成功")
 
 	notifRepo := infraRepo.NewNotificationRepository(db)
 	todoRepo := infraRepo.NewTodoRepository(db)
