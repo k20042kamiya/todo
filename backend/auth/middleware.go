@@ -56,6 +56,8 @@ func Auth(authClient *firebaseauth.Client, userUsecase userpkg.Usecase) echo.Mid
 			ctx := appcontext.SetUserID(c.Request().Context(), user.ID)
 			c.SetRequest(c.Request().WithContext(ctx))
 
+			slog.InfoContext(ctx, "user authenticated", "userID", user.ID, "uid", token.UID, "method", c.Request().Method, "path", c.Path())
+
 			return next(c)
 		}
 	}

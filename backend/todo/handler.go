@@ -116,6 +116,8 @@ func (h *Handler) GetTodos(c echo.Context) error {
 		response.Todos[i] = toResponse(todo)
 	}
 
+	slog.InfoContext(ctx, "GetTodos succeeded", "userID", userID, "count", len(todos))
+
 	return c.JSON(http.StatusOK, response)
 }
 
@@ -151,6 +153,8 @@ func (h *Handler) CreateTodo(c echo.Context) error {
 		}
 		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
+
+	slog.InfoContext(ctx, "CreateTodo succeeded", "userID", userID, "todoID", todo.ID)
 
 	return c.JSON(http.StatusCreated, toResponse(todo))
 }
@@ -194,6 +198,8 @@ func (h *Handler) UpdateTodo(c echo.Context) error {
 		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
 
+	slog.InfoContext(ctx, "UpdateTodo succeeded", "userID", userID, "todoID", todoID)
+
 	return c.JSON(http.StatusOK, toResponse(todo))
 }
 
@@ -218,6 +224,8 @@ func (h *Handler) DeleteTodo(c echo.Context) error {
 		}
 		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
+
+	slog.InfoContext(ctx, "DeleteTodo succeeded", "userID", userID, "todoID", todoID)
 
 	return c.NoContent(http.StatusNoContent)
 }
