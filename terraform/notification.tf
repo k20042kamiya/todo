@@ -29,6 +29,7 @@ resource "aws_ecs_task_definition" "notification" {
       { name = "DB_USER",         value = var.db_username },
       { name = "SES_FROM_EMAIL",  value = var.ses_sender_email },
       { name = "AWS_REGION_NAME", value = var.aws_region },
+      { name = "FRONTEND_URL",    value = "https://${var.domain_name}" },
     ]
     secrets = [
       { name = "DB_PASSWORD", valueFrom = aws_ssm_parameter.db_password.arn },
