@@ -8,14 +8,6 @@ terraform {
     }
   }
 
-  # 初回apply前にS3バケットとDynamoDBテーブルを手動作成してからコメントアウトを外す
-  # backend "s3" {
-  #   bucket         = "todo-app-terraform-state"
-  #   key            = "prod/terraform.tfstate"
-  #   region         = "ap-northeast-1"
-  #   dynamodb_table = "todo-app-terraform-lock"
-  #   encrypt        = true
-  # }
 }
 
 provider "aws" {
