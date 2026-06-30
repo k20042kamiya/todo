@@ -57,6 +57,7 @@ resource "aws_iam_role_policy" "github_actions_ecs" {
         Action = [
           "ecs:RegisterTaskDefinition",
           "ecs:DescribeTaskDefinition",
+          "ecs:DescribeTasks",
           "ecs:UpdateService",
           "ecs:DescribeServices",
           "ecs:RunTask",
