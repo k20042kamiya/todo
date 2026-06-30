@@ -84,8 +84,8 @@ resource "aws_iam_role_policy" "github_actions_frontend" {
         Effect = "Allow"
         Action = ["s3:PutObject", "s3:DeleteObject", "s3:GetObject", "s3:ListBucket"]
         Resource = [
-          "arn:aws:s3:::${local.name_prefix}-frontend",
-          "arn:aws:s3:::${local.name_prefix}-frontend/*",
+          aws_s3_bucket.frontend.arn,
+          "${aws_s3_bucket.frontend.arn}/*",
         ]
       },
       {
