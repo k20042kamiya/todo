@@ -23,7 +23,7 @@ EventBridge Scheduler (cron) → ECS Fargate タスク起動
     ├─ SESクライアント初期化
     ├─ NotificationUsecase.CheckAndSendNotifications(ctx)
     │     │
-    │     ├─ 未完了かつ期日あるTODOを全件取得
+    │     ├─ TodoRepository.FindUncompletedTodosWithDueDate で未完了かつ期日あるTODOを全件取得
     │     └─ 各TODOに対して:
     │           ├─ 期日判定（overdue / approaching / 対象外）
     │           ├─ 重複チェック
@@ -51,6 +51,7 @@ notification/
 │   │   └── user.go                          # Userエンティティ
 │   └── repository/
 │       ├── notification_repository.go       # NotificationRepositoryインターフェース
+│       ├── todo_repository.go               # TodoRepositoryインターフェース
 │       └── user_repository.go               # UserRepositoryインターフェース
 ├── usecase/
 │   ├── notification_usecase.go              # 通知ユースケース実装
@@ -63,6 +64,7 @@ notification/
     │   └── ses_sender.go                    # SESメール送信実装
     └── repository/
         ├── notification_repository.go       # NotificationRepository実装
+        ├── todo_repository.go               # TodoRepository実装
         └── user_repository.go               # UserRepository実装
 ```
 
@@ -150,13 +152,20 @@ type User struct {
 
 ```go
 type NotificationRepository interface {
-    // 対象TODOと通知種別で既存通知を検索（重複防止用）
+    // 対象TODOについて当日（UTC 00:00以降）に送信済みの通知を検索（重複防止用）
+    // 条件: todo_id = ? AND sent_at >= 当日0時(UTC)
     // 存在しない場合は (nil, nil) を返す
-    FindByTodoIDAndType(ctx context.Context, todoID int, notifType string) (*entity.Notification, error)
+    FindTodayByTodoID(ctx context.Context, todoID int) (*entity.Notification, error)
 
     // 通知レコードを新規作成
     Create(ctx context.Context, notification *entity.Notification) error
+}
+```
 
+### TodoRepository
+
+```go
+type TodoRepository interface {
     // 未完了かつ期日が設定されている全TODOを取得
     // 条件: is_completed = false AND due_date IS NOT NULL AND deleted_at IS NULL
     FindUncompletedTodosWithDueDate(ctx context.Context) ([]*entity.Todo, error)
@@ -199,18 +208,21 @@ daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 （逆順にすると、メール送信失敗時に記録だけが残り次回実行で永久にスキップされる。）
 
 ```
-1. FindByTodoIDAndType で重複確認
+1. FindTodayByTodoID で当日の重複確認
 2. userRepo.FindByID でユーザー取得
 3. emailSender.Send でメール送信      ← 先に送信
 4. notificationRepo.Create でレコード保存  ← 成功後に保存
 ```
 
+> **重複防止の方針:** 同一TODOに対して当日（UTC基準）にすでに通知済みの場合はスキップする。
+> 翌日以降は再度通知対象となる（期日が通知条件を満たす間は毎日1通送信）。
+
 ### メール本文仕様
 
 | 種別 | 件名 | 本文 |
 |------|------|------|
-| approaching | `【期日間近】{title}` | `TODOの期日が近づいています。\nタイトル: {title}\n期日: {YYYY-MM-DD}\nTODOを確認する: {FRONTEND_URL}\n期日までに完了してください。` |
-| overdue | `【期日超過】{title}` | `TODOの期日が過ぎています。\nタイトル: {title}\n期日: {YYYY-MM-DD}\nTODOを確認する: {FRONTEND_URL}\n早急に対応してください。` |
+| approaching | `【期日間近】{title}` | `TODOの期日が近づいています。\n\nタイトル: {title}\n期日: {YYYY-MM-DD}\n\nTODOを確認する: {FRONTEND_URL}\n\n期日までに完了してください。` |
+| overdue | `【期日超過】{title}` | `TODOの期日が過ぎています。\n\nタイトル: {title}\n期日: {YYYY-MM-DD}\n\nTODOを確認する: {FRONTEND_URL}\n\n早急に対応してください。` |
 
 ---
 
@@ -275,7 +287,7 @@ daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 - [x] DB接続失敗時に `os.Exit(1)` でプロセス終了している
 - [x] SESクライアント初期化失敗時に `os.Exit(1)` でプロセス終了している
 - [x] TODO取得失敗時に error を返し `main` が `os.Exit(1)` でプロセス終了している
-- [x] 重複確認クエリ失敗時にスキップ（安全側）+ `WARN` ログ出力している
+- [x] 当日の重複確認クエリ（`FindTodayByTodoID`）失敗時にスキップ（安全側）+ `WARN` ログ出力している
 - [x] メール送信後に通知レコードを保存している
 - [x] SESサービス障害を個別エラーと区別してプロセス終了している
 
