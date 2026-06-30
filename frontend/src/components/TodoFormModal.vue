@@ -123,7 +123,7 @@ watch(() => props.todo, (newTodo) => {
  *       title: title.value,
  *       content: content.value,
  *       // dueDate が空でなければ ISO 8601 形式に変換して送信
- *       due_date: dueDate.value ? new Date(dueDate.value).toISOString() : undefined,
+ *       due_date: dueDate.value ? new Date(dueDate.value + 'T23:59:59').toISOString() : undefined,
  *     })
  *   }
  *
@@ -181,6 +181,7 @@ function handleSubmit() {
             type="text"
             class="form-input"
             placeholder="タスクのタイトル"
+            maxlength="100"
           />
         </div>
 

@@ -30,6 +30,7 @@ import * as api from '@/lib/api'
 // ---- グローバル状態（全コンポーネントで共有） ----
 const todos = ref<Todo[]>([])
 const loading = ref(false)
+const error = ref<string | null>(null)
 
 export function useTodos() {
   /**
@@ -59,8 +60,9 @@ export function useTodos() {
     loading.value = true
     try {
       todos.value = await api.fetchTodos()
-    } catch (error) {
-      console.error('TODO一覧の取得に失敗:', error)
+    } catch (e) {
+      error.value = 'TODO一覧の取得に失敗しました'
+      console.error('TODO一覧の取得に失敗:', e)
     } finally {
       loading.value = false
     }
@@ -88,8 +90,11 @@ export function useTodos() {
       // push() は配列の末尾に要素を追加するメソッドです。
       const newTodo = await api.createTodo(data)
       todos.value.push(newTodo)
-    } catch (error) {
-      console.error('TODOの作成に失敗:', error)
+      error.value = null
+    } catch (e) {
+      error.value = 'TODOの作成に失敗しました'
+      console.error('TODOの作成に失敗:', e)
+      throw e
     }
   }
 
@@ -118,8 +123,11 @@ export function useTodos() {
       //     → [{id:1,...}, {更新されたid:2のデータ}]
       const updatedTodo = await api.updateTodo(id, data)
       todos.value = todos.value.map(t => t.id === id ? updatedTodo : t)
-    } catch (error) {
-      console.error('TODOの更新に失敗:', error)
+      error.value = null
+    } catch (e) {
+      error.value = 'TODOの更新に失敗しました'
+      console.error('TODOの更新に失敗:', e)
+      throw e
     }
   }
 
@@ -147,8 +155,9 @@ export function useTodos() {
       // 削除対象だけが除外された新しい配列になります。
       await api.deleteTodo(id)
       todos.value = todos.value.filter(t => t.id !== id)
-    } catch (error) {
-      console.error('TODOの削除に失敗:', error)
+    } catch (e) {
+      error.value = 'TODOの削除に失敗しました'
+      console.error('TODOの削除に失敗:', e)
     }
   }
 
@@ -213,14 +222,16 @@ export function useTodos() {
       await Promise.all(completedTodos.map(t => api.deleteTodo(t.id)))
       // サーバー側の削除が成功したら、ローカルの配列からも完了済みを除外
       todos.value = todos.value.filter(t => !t.is_completed)
-    } catch (error) {
-      console.error('完了済みTODOの削除に失敗:', error)
+    } catch (e) {
+      error.value = '完了済みTODOの削除に失敗しました'
+      console.error('完了済みTODOの削除に失敗:', e)
     }
   }
 
   return {
     todos,
     loading,
+    error,
     fetchTodos,
     addTodo,
     editTodo,

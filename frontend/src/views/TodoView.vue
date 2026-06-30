@@ -78,7 +78,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useRouter } from 'vue-router'
 
 const {
-  fetchTodos, addTodo, editTodo, removeTodo, toggleComplete, removeCompleted
+  fetchTodos, addTodo, editTodo, removeTodo, toggleComplete, removeCompleted, error
 } = useTodos()
 const {
   currentFilter, filteredTodos, remainingCount, completedCount, progressPercentage, setFilter
@@ -122,6 +122,7 @@ function openEditForm(todo: Todo) {
 function closeModal() {
   showModal.value = false
   editingTodo.value = null
+  error.value = null
 }
 
 /**
@@ -149,12 +150,16 @@ function closeModal() {
 // 「as UpdateTodoRequest」は TypeScript に「この値はUpdateTodoRequest型だよ」と伝える
 // 型アサーション（型の断定）です。実行時には何も起きず、コンパイル時の型チェック用です。
 async function handleSave(data: CreateTodoRequest | UpdateTodoRequest) {
-  if (editingTodo.value) {
-    await editTodo(editingTodo.value.id, data as UpdateTodoRequest)
-  } else {
-    await addTodo(data as CreateTodoRequest)
+  try {
+    if (editingTodo.value) {
+      await editTodo(editingTodo.value.id, data as UpdateTodoRequest)
+    } else {
+      await addTodo(data as CreateTodoRequest)
+    }
+    closeModal()
+  } catch {
+    // error.value は useTodos 側でセット済み、モーダルはそのまま表示
   }
-  closeModal()
 }
 
 /**
@@ -311,6 +316,8 @@ function getFormattedDate(): string {
          v-if="showModal" は showModal が true の場合のみコンポーネントを描画します。
          false の場合はDOMから完全に削除されます（v-show とは異なり、非表示ではなく削除）。
          :todo="editingTodo" で編集対象のTODOを渡し、null なら新規作成モードになります。 -->
+    <div v-if="error" class="error-banner">{{ error }}</div>
+
     <TodoFormModal
       v-if="showModal"
       :todo="editingTodo"
@@ -381,5 +388,15 @@ function getFormattedDate(): string {
 
 .btn-new-task:hover {
   background-color: #d55a40;
+}
+
+.error-banner {
+  background-color: #fff0ed;
+  border: 1px solid #e86c50;
+  color: #c0392b;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 12px;
 }
 </style>
