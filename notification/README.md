@@ -4,6 +4,8 @@
 
 未完了かつ期日が設定されているTODOを対象に、期日の状態に応じてユーザーへメール通知を送信するバッチサービス。
 
+`backend/`（APIサーバー）と同じ Clean Architecture を採用。`handler` レイヤーはなく、`main.go` が直接 usecase を呼び出す点が異なる。
+
 | 項目 | 内容 |
 |------|------|
 | 言語 | Go 1.24+ |
@@ -201,6 +203,30 @@ daysUntilDue := int(dueDay.Sub(today).Hours() / 24)
 | `daysUntilDue < 0`（期日が過去） | `overdue` |
 | `0 <= daysUntilDue <= 3`（期日まで3日以内） | `approaching` |
 | `daysUntilDue > 3`（期日まで4日以上） | 通知なし（スキップ） |
+
+```mermaid
+stateDiagram-v2
+    [*] --> 判定 : バッチ起動・TODO取得
+
+    判定 --> スキップ : 完了済み / 期日なし
+    判定 --> 通知なし : 期日まで4日以上
+    判定 --> approaching : 期日まで0〜3日
+    判定 --> overdue : 期日超過
+
+    approaching --> 重複確認
+    overdue --> 重複確認
+
+    重複確認 --> スキップ : 当日送信済み
+    重複確認 --> 送信処理 : 未送信
+
+    送信処理 --> レコード保存 : 送信成功
+    送信処理 --> スキップ : 無効アドレス（ErrInvalidRecipient）
+    送信処理 --> [*] : SESサービス障害（プロセス終了）
+
+    レコード保存 --> [*] : 完了
+    スキップ --> [*]
+    通知なし --> [*]
+```
 
 ### sendNotificationIfNeeded 処理順序
 

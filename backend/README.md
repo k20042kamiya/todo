@@ -6,6 +6,8 @@ Package by Feature + Clean Architecture
 
 各機能（todo, user）のパッケージ内に、クリーンアーキテクチャのレイヤーをディレクトリで表現する。
 
+`notification/`（通知バッチ）も同じ Clean Architecture を採用しており、依存の向きは共通。外部とのI/FがHTTPハンドラーかSESメール送信かという点だけが異なる。
+
 ---
 
 ## ディレクトリ構造
@@ -56,6 +58,60 @@ backend/
       errors.go
       codes.go
       errors_test.go
+```
+
+---
+
+## クラス図
+
+todo 機能を例に、各レイヤーのクラスと依存関係を示す。
+
+```mermaid
+classDiagram
+    class Todo {
+        +int ID
+        +int UserID
+        +string Title
+        +string Content
+        +time.Time DueDate
+        +bool IsCompleted
+        +time.Time CreatedAt
+        +time.Time UpdatedAt
+    }
+    class TodoDomainRepository {
+        <<interface>>
+        +FindByUserID(ctx, userID) []Todo
+        +FindByIDAndUserID(ctx, id, userID) Todo
+        +Create(ctx, todo) error
+        +Update(ctx, todo) error
+        +Delete(ctx, id, userID) error
+    }
+    class TodoUsecase {
+        <<interface>>
+        +GetTodos(ctx, userID) []Todo
+        +CreateTodo(ctx, input) Todo
+        +UpdateTodo(ctx, input) Todo
+        +DeleteTodo(ctx, id, userID) error
+    }
+    class todoUsecaseImpl {
+        -repo TodoDomainRepository
+        -txm transaction.Manager
+    }
+    class TodoHandler {
+        -usecase TodoUsecase
+        +GetTodos(c) error
+        +CreateTodo(c) error
+        +UpdateTodo(c) error
+        +DeleteTodo(c) error
+    }
+    class infraTodoRepository {
+        -db gorm.DB
+    }
+
+    TodoDomainRepository <|.. infraTodoRepository : implements
+    TodoUsecase <|.. todoUsecaseImpl : implements
+    TodoHandler --> TodoUsecase : depends
+    todoUsecaseImpl --> TodoDomainRepository : depends
 ```
 
 ---
