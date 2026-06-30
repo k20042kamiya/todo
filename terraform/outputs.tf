@@ -28,3 +28,8 @@ output "notification_ecr_repository_url" {
   description = "通知バッチ用ECRリポジトリURL (CI/CDでdocker pushに使用)"
   value       = aws_ecr_repository.notification.repository_url
 }
+
+output "github_actions_role_arn" {
+  description = "GitHub Actions用IAMロールARN (AWS_ROLE_ARN Secretに設定する)"
+  value       = aws_iam_role.github_actions.arn
+}
