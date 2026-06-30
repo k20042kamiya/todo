@@ -107,11 +107,63 @@ jobs:
 
           echo "image-uri=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
-  deploy:
-    name: Deploy to ECS Fargate
+  migrate:
+    name: DB Migration
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production  # GitHub Environmentsによる承認フロー
+    environment: production
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Run DB migration on ECS
+        env:
+          CLUSTER: ${{ vars.ECS_CLUSTER_NAME }}
+          TASK_FAMILY: ${{ vars.ECS_TASK_DEFINITION }}
+          SUBNET_IDS: ${{ vars.ECS_MIGRATE_SUBNET_IDS }}
+          SECURITY_GROUP_ID: ${{ vars.ECS_MIGRATE_SECURITY_GROUP_ID }}
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
+        run: |
+          TASK_DEF_ARN=$(aws ecs describe-task-definition \
+            --task-definition "$TASK_FAMILY" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --task-definition "$TASK_DEF_ARN" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SECURITY_GROUP_ID],assignPublicIp=DISABLED}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"api\",\"image\":\"$IMAGE_URI\",\"command\":[\"./migrate\"]}]}" \
+            --query "tasks[0].taskArn" \
+            --output text)
+
+          echo "Migration task: $TASK_ARN"
+
+          aws ecs wait tasks-stopped \
+            --cluster "$CLUSTER" \
+            --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "$CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --query "tasks[0].containers[0].exitCode" \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+          echo "Migration succeeded"
+
+  deploy:
+    name: Deploy to ECS Fargate
+    needs: [build-and-push, migrate]
+    runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
