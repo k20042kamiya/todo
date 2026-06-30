@@ -55,7 +55,7 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 	now := time.Now()
 	today := now.UTC().Truncate(24 * time.Hour)
 	sentCount := 0
-	skippedCount := 0
+	notYetDueCount := 0
 	for _, todo := range todos {
 		if todo.DueDate == nil {
 			continue
@@ -71,7 +71,7 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 		case daysUntilDue <= 3:
 			notifType = entity.NotificationTypeApproaching
 		default:
-			skippedCount++
+			notYetDueCount++
 			continue
 		}
 
@@ -83,7 +83,7 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 		sentCount++
 	}
 
-	slog.InfoContext(ctx, "通知チェック完了", "sent", sentCount, "skipped", skippedCount)
+	slog.InfoContext(ctx, "通知チェック完了", "sent", sentCount, "not_yet_due", notYetDueCount)
 	return nil
 }
 
