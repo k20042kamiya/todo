@@ -185,11 +185,8 @@ resource "aws_iam_role_policy" "ecs_task_ses" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource = [
-        "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}",
-        "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/${var.ses_sender_email}",
-      ]
+      Action   = ["ses:SendEmail", "ses:SendRawEmail"]
+      Resource = "*"
     }]
   })
 }
