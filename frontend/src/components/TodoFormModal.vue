@@ -144,7 +144,7 @@ function handleSubmit() {
   emit('save', {
     title: title.value,
     content: content.value,
-    due_date: dueDate.value ? new Date(dueDate.value).toISOString() : undefined,
+    due_date: dueDate.value || undefined,
   })
 }
 </script>
