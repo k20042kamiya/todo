@@ -85,7 +85,7 @@ func TestCheckAndSendNotifications_Approaching(t *testing.T) {
 		},
 	}
 
-	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestCheckAndSendNotifications_Overdue(t *testing.T) {
 		},
 	}
 
-	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestCheckAndSendNotifications_DuplicateSkip(t *testing.T) {
 	userRepo := &mockUserRepository{}
 	emailSender := &mockEmailSender{}
 
-	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestCheckAndSendNotifications_NoDueDate(t *testing.T) {
 	userRepo := &mockUserRepository{}
 	emailSender := &mockEmailSender{}
 
-	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestCheckAndSendNotifications_FarFutureDueDate(t *testing.T) {
 	userRepo := &mockUserRepository{}
 	emailSender := &mockEmailSender{}
 
-	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
 	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

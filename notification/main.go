@@ -44,7 +44,8 @@ func run(ctx context.Context) (retErr error) {
 	notifRepo := infraRepo.NewNotificationRepository(db)
 	todoRepo := infraRepo.NewTodoRepository(db)
 	userRepo := infraRepo.NewUserRepository(db)
-	notifUsecase := usecase.NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender)
+	frontendURL := os.Getenv("FRONTEND_URL")
+	notifUsecase := usecase.NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, frontendURL)
 
 	if err := notifUsecase.CheckAndSendNotifications(ctx); err != nil {
 		return fmt.Errorf("通知送信に失敗: %w", err)

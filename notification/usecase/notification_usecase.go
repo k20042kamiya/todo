@@ -24,6 +24,7 @@ type notificationUsecase struct {
 	todoRepo         repository.TodoRepository
 	userRepo         repository.UserRepository
 	emailSender      EmailSender
+	frontendURL      string
 }
 
 func NewNotificationUsecase(
@@ -31,12 +32,14 @@ func NewNotificationUsecase(
 	todoRepo repository.TodoRepository,
 	userRepo repository.UserRepository,
 	emailSender EmailSender,
+	frontendURL string,
 ) NotificationUsecase {
 	return &notificationUsecase{
 		notificationRepo: notificationRepo,
 		todoRepo:         todoRepo,
 		userRepo:         userRepo,
 		emailSender:      emailSender,
+		frontendURL:      frontendURL,
 	}
 }
 
@@ -134,12 +137,12 @@ func (u *notificationUsecase) buildEmailContent(todo *entity.Todo, notifType str
 	switch notifType {
 	case entity.NotificationTypeApproaching:
 		subject = fmt.Sprintf("【期日間近】%s", todo.Title)
-		body = fmt.Sprintf("TODOの期日が近づいています。\n\nタイトル: %s\n期日: %s\n\n期日までに完了してください。",
-			todo.Title, todo.DueDate.Format("2006-01-02"))
+		body = fmt.Sprintf("TODOの期日が近づいています。\n\nタイトル: %s\n期日: %s\n\nTODOを確認する: %s\n\n期日までに完了してください。",
+			todo.Title, todo.DueDate.Format("2006-01-02"), u.frontendURL)
 	case entity.NotificationTypeOverdue:
 		subject = fmt.Sprintf("【期日超過】%s", todo.Title)
-		body = fmt.Sprintf("TODOの期日が過ぎています。\n\nタイトル: %s\n期日: %s\n\n早急に対応してください。",
-			todo.Title, todo.DueDate.Format("2006-01-02"))
+		body = fmt.Sprintf("TODOの期日が過ぎています。\n\nタイトル: %s\n期日: %s\n\nTODOを確認する: %s\n\n早急に対応してください。",
+			todo.Title, todo.DueDate.Format("2006-01-02"), u.frontendURL)
 	}
 	return
 }
