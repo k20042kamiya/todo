@@ -2,9 +2,10 @@ package todo
 
 import (
 	"context"
-	"log"
+	"errors"
 
 	"todo/infrastructure/database"
+	apperrors "todo/shared/errors"
 
 	"gorm.io/gorm"
 )
@@ -24,8 +25,7 @@ func (r *repository) getDB(ctx context.Context) *gorm.DB {
 func (r *repository) FindByUserID(ctx context.Context, userID int) ([]*Todo, error) {
 	var todos []*Todo
 	if err := r.getDB(ctx).Where("user_id = ?", userID).Order("created_at DESC").Find(&todos).Error; err != nil {
-		log.Printf("[WARN] FindByUserID failed: userID=%d, error=%v", userID, err)
-		return nil, err
+		return nil, apperrors.Wrap(apperrors.ErrCodeDatabase, "FindByUserID", err)
 	}
 	return todos, nil
 }
@@ -33,19 +33,31 @@ func (r *repository) FindByUserID(ctx context.Context, userID int) ([]*Todo, err
 func (r *repository) FindByID(ctx context.Context, id int) (*Todo, error) {
 	var todo Todo
 	if err := r.getDB(ctx).Where("id = ?", id).First(&todo).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(apperrors.ErrCodeNotFound, "todo not found")
+		}
+		return nil, apperrors.Wrap(apperrors.ErrCodeDatabase, "FindByID", err)
 	}
 	return &todo, nil
 }
 
 func (r *repository) Create(ctx context.Context, todo *Todo) error {
-	return r.getDB(ctx).Create(todo).Error
+	if err := r.getDB(ctx).Create(todo).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrCodeDatabase, "Create todo", err)
+	}
+	return nil
 }
 
 func (r *repository) Update(ctx context.Context, todo *Todo) error {
-	return r.getDB(ctx).Save(todo).Error
+	if err := r.getDB(ctx).Save(todo).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrCodeDatabase, "Update todo", err)
+	}
+	return nil
 }
 
-func (r *repository) Delete(ctx context.Context, id int) error {
-	return r.getDB(ctx).Delete(&Todo{ID: id}).Error
+func (r *repository) Delete(ctx context.Context, id int, userID int) error {
+	if err := r.getDB(ctx).Where("user_id = ?", userID).Delete(&Todo{ID: id}).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrCodeDatabase, "Delete todo", err)
+	}
+	return nil
 }

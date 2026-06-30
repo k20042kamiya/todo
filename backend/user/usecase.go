@@ -2,9 +2,8 @@ package user
 
 import (
 	"context"
-	"errors"
 
-	"gorm.io/gorm"
+	apperrors "todo/shared/errors"
 )
 
 type Usecase interface {
@@ -24,7 +23,7 @@ func (u *usecase) FindOrCreateByFirebaseUID(ctx context.Context, firebaseUID, em
 	if err == nil {
 		return user, nil
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if apperrors.GetCode(err) != apperrors.ErrCodeNotFound {
 		return nil, err
 	}
 

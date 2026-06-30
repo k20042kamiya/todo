@@ -7,5 +7,5 @@ type Repository interface {
 	FindByID(ctx context.Context, id int) (*Todo, error)
 	Create(ctx context.Context, todo *Todo) error
 	Update(ctx context.Context, todo *Todo) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int, userID int) error
 }

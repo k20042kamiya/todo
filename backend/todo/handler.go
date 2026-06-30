@@ -1,14 +1,23 @@
 package todo
 
 import (
+	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"todo/shared/appcontext"
+	apperrors "todo/shared/errors"
 
 	"github.com/labstack/echo/v4"
 )
+
+type DateOnly struct{ time.Time }
+
+func (d DateOnly) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Format("2006-01-02"))
+}
 
 type Handler struct {
 	usecase Usecase
@@ -26,7 +35,7 @@ type createTodoRequest struct {
 
 type updateTodoRequest struct {
 	Title       string     `json:"title"`
-	Content     string     `json:"content"`
+	Content     *string    `json:"content"`
 	DueDate     *time.Time `json:"due_date"`
 	IsCompleted bool       `json:"is_completed"`
 }
@@ -36,7 +45,7 @@ type TodoResponse struct {
 	UserID      int        `json:"user_id"`
 	Title       string     `json:"title"`
 	Content     *string    `json:"content"`
-	DueDate     *time.Time `json:"due_date"`
+	DueDate     *DateOnly  `json:"due_date"`
 	IsCompleted bool       `json:"is_completed"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
@@ -47,12 +56,17 @@ type TodoListResponse struct {
 }
 
 func toResponse(todo *Todo) *TodoResponse {
+	var dueDate *DateOnly
+	if todo.DueDate != nil {
+		d := DateOnly{*todo.DueDate}
+		dueDate = &d
+	}
 	return &TodoResponse{
 		ID:          todo.ID,
 		UserID:      todo.UserID,
 		Title:       todo.Title,
 		Content:     todo.Content,
-		DueDate:     todo.DueDate,
+		DueDate:     dueDate,
 		IsCompleted: todo.IsCompleted,
 		CreatedAt:   todo.CreatedAt,
 		UpdatedAt:   todo.UpdatedAt,
@@ -69,7 +83,11 @@ func (h *Handler) GetTodos(c echo.Context) error {
 
 	todos, err := h.usecase.GetTodosByUserID(ctx, userID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get todos"})
+		code := apperrors.GetCode(err)
+		if code.HTTPStatus() >= 500 {
+			slog.ErrorContext(ctx, "GetTodosByUserID failed", "userID", userID, "error", err)
+		}
+		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
 
 	response := &TodoListResponse{Todos: make([]*TodoResponse, len(todos))}
@@ -96,6 +114,9 @@ func (h *Handler) CreateTodo(c echo.Context) error {
 	if req.Title == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
 	}
+	if len([]rune(req.Title)) > 100 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title must be 100 characters or less"})
+	}
 
 	todo, err := h.usecase.CreateTodo(ctx, userID, CreateInput{
 		Title:   req.Title,
@@ -103,7 +124,11 @@ func (h *Handler) CreateTodo(c echo.Context) error {
 		DueDate: req.DueDate,
 	})
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create todo"})
+		code := apperrors.GetCode(err)
+		if code.HTTPStatus() >= 500 {
+			slog.ErrorContext(ctx, "CreateTodo failed", "userID", userID, "error", err)
+		}
+		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
 
 	return c.JSON(http.StatusCreated, toResponse(todo))
@@ -130,6 +155,9 @@ func (h *Handler) UpdateTodo(c echo.Context) error {
 	if req.Title == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
 	}
+	if len([]rune(req.Title)) > 100 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title must be 100 characters or less"})
+	}
 
 	todo, err := h.usecase.UpdateTodo(ctx, userID, todoID, UpdateInput{
 		Title:       req.Title,
@@ -138,13 +166,11 @@ func (h *Handler) UpdateTodo(c echo.Context) error {
 		IsCompleted: req.IsCompleted,
 	})
 	if err != nil {
-		if err.Error() == "forbidden" {
-			return c.JSON(http.StatusForbidden, map[string]string{"error": "You don't have permission to update this todo"})
+		code := apperrors.GetCode(err)
+		if code.HTTPStatus() >= 500 {
+			slog.ErrorContext(ctx, "UpdateTodo failed", "userID", userID, "todoID", todoID, "error", err)
 		}
-		if err.Error() == "record not found" {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "Todo not found"})
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update todo"})
+		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
 
 	return c.JSON(http.StatusOK, toResponse(todo))
@@ -165,14 +191,22 @@ func (h *Handler) DeleteTodo(c echo.Context) error {
 
 	err = h.usecase.DeleteTodo(ctx, userID, todoID)
 	if err != nil {
-		if err.Error() == "forbidden" {
-			return c.JSON(http.StatusForbidden, map[string]string{"error": "You don't have permission to delete this todo"})
+		code := apperrors.GetCode(err)
+		if code.HTTPStatus() >= 500 {
+			slog.ErrorContext(ctx, "DeleteTodo failed", "userID", userID, "todoID", todoID, "error", err)
 		}
-		if err.Error() == "record not found" {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "Todo not found"})
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to delete todo"})
+		return c.JSON(code.HTTPStatus(), map[string]string{"error": safeMessage(code, err)})
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func safeMessage(code apperrors.ErrorCode, err error) string {
+	switch code {
+	case apperrors.ErrCodeNotFound, apperrors.ErrCodeForbidden,
+		apperrors.ErrCodeValidation, apperrors.ErrCodeUnauthorized:
+		return err.Error()
+	default:
+		return "Internal server error"
+	}
 }

@@ -3,7 +3,6 @@ package todo
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"todo/shared/appcontext"
+	apperrors "todo/shared/errors"
 
 	"github.com/labstack/echo/v4"
 )
@@ -85,7 +85,7 @@ func TestHandler_GetTodos(t *testing.T) {
 		{
 			name:           "異常系: ユースケースがエラーを返す",
 			mockReturn:     nil,
-			mockError:      errors.New("database error"),
+			mockError:      apperrors.New(apperrors.ErrCodeDatabase, "database error"),
 			expectedStatus: http.StatusInternalServerError,
 			expectedLen:    0,
 		},
@@ -176,9 +176,20 @@ func TestHandler_CreateTodo(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
+			name:           "異常系: タイトルが101文字",
+			requestBody:    `{"title":"` + strings.Repeat("あ", 101) + `"}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "正常系: タイトルがちょうど100文字",
+			requestBody:    `{"title":"` + strings.Repeat("あ", 100) + `"}`,
+			mockReturn:     &Todo{ID: 1, UserID: 1, Title: strings.Repeat("あ", 100), IsCompleted: false},
+			expectedStatus: http.StatusCreated,
+		},
+		{
 			name:           "異常系: ユースケースがエラーを返す",
 			requestBody:    `{"title":"テストTODO"}`,
-			mockError:      errors.New("database error"),
+			mockError:      apperrors.New(apperrors.ErrCodeDatabase, "database error"),
 			expectedStatus: http.StatusInternalServerError,
 		},
 	}
@@ -244,24 +255,30 @@ func TestHandler_UpdateTodo(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
+			name:           "異常系: タイトルが101文字",
+			todoID:         "1",
+			requestBody:    `{"title":"` + strings.Repeat("あ", 101) + `"}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
 			name:           "異常系: 権限がない",
 			todoID:         "1",
 			requestBody:    `{"title":"テストTODO"}`,
-			mockError:      errors.New("forbidden"),
+			mockError:      apperrors.New(apperrors.ErrCodeForbidden, "forbidden"),
 			expectedStatus: http.StatusForbidden,
 		},
 		{
 			name:           "異常系: TODOが見つからない",
 			todoID:         "999",
 			requestBody:    `{"title":"テストTODO"}`,
-			mockError:      errors.New("record not found"),
+			mockError:      apperrors.New(apperrors.ErrCodeNotFound, "todo not found"),
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name:           "異常系: ユースケースがエラーを返す",
 			todoID:         "1",
 			requestBody:    `{"title":"テストTODO"}`,
-			mockError:      errors.New("database error"),
+			mockError:      apperrors.New(apperrors.ErrCodeDatabase, "database error"),
 			expectedStatus: http.StatusInternalServerError,
 		},
 	}
@@ -327,19 +344,19 @@ func TestHandler_DeleteTodo(t *testing.T) {
 		{
 			name:           "異常系: 権限がない",
 			todoID:         "1",
-			mockError:      errors.New("forbidden"),
+			mockError:      apperrors.New(apperrors.ErrCodeForbidden, "forbidden"),
 			expectedStatus: http.StatusForbidden,
 		},
 		{
 			name:           "異常系: TODOが見つからない",
 			todoID:         "999",
-			mockError:      errors.New("record not found"),
+			mockError:      apperrors.New(apperrors.ErrCodeNotFound, "todo not found"),
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name:           "異常系: ユースケースがエラーを返す",
 			todoID:         "1",
-			mockError:      errors.New("database error"),
+			mockError:      apperrors.New(apperrors.ErrCodeDatabase, "database error"),
 			expectedStatus: http.StatusInternalServerError,
 		},
 	}
@@ -396,7 +413,7 @@ func TestHandler_DeleteTodo_Unauthorized(t *testing.T) {
 func TestTodoResponse_JSONFields(t *testing.T) {
 	now := time.Now()
 	content := "テスト内容"
-	dueDate := now.Add(24 * time.Hour)
+	dueDate := DateOnly{now.Add(24 * time.Hour)}
 
 	response := TodoResponse{
 		ID: 1, UserID: 1, Title: "テストタイトル", Content: &content,

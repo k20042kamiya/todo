@@ -2,9 +2,9 @@ package todo
 
 import (
 	"context"
-	"errors"
 	"time"
 
+	apperrors "todo/shared/errors"
 	"todo/shared/transaction"
 )
 
@@ -23,7 +23,7 @@ type CreateInput struct {
 
 type UpdateInput struct {
 	Title       string
-	Content     string
+	Content     *string
 	DueDate     *time.Time
 	IsCompleted bool
 }
@@ -74,11 +74,11 @@ func (u *usecase) UpdateTodo(ctx context.Context, userID int, todoID int, input 
 		}
 
 		if todo.UserID != userID {
-			return errors.New("forbidden")
+			return apperrors.New(apperrors.ErrCodeForbidden, "forbidden")
 		}
 
 		todo.Title = input.Title
-		todo.Content = &input.Content
+		todo.Content = input.Content
 		todo.DueDate = input.DueDate
 		todo.IsCompleted = input.IsCompleted
 
@@ -99,9 +99,9 @@ func (u *usecase) DeleteTodo(ctx context.Context, userID int, todoID int) error 
 		}
 
 		if todo.UserID != userID {
-			return errors.New("forbidden")
+			return apperrors.New(apperrors.ErrCodeForbidden, "forbidden")
 		}
 
-		return u.repo.Delete(ctx, todoID)
+		return u.repo.Delete(ctx, todoID, userID)
 	})
 }

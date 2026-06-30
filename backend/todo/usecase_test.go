@@ -18,7 +18,7 @@ type mockRepository struct {
 	findByIDFunc     func(ctx context.Context, id int) (*Todo, error)
 	createFunc       func(ctx context.Context, todo *Todo) error
 	updateFunc       func(ctx context.Context, todo *Todo) error
-	deleteFunc       func(ctx context.Context, id int) error
+	deleteFunc       func(ctx context.Context, id int, userID int) error
 }
 
 func (m *mockRepository) FindByUserID(ctx context.Context, userID int) ([]*Todo, error) {
@@ -46,9 +46,9 @@ func (m *mockRepository) Update(ctx context.Context, todo *Todo) error {
 	return nil
 }
 
-func (m *mockRepository) Delete(ctx context.Context, id int) error {
+func (m *mockRepository) Delete(ctx context.Context, id int, userID int) error {
 	if m.deleteFunc != nil {
-		return m.deleteFunc(ctx, id)
+		return m.deleteFunc(ctx, id, userID)
 	}
 	return nil
 }
@@ -152,6 +152,7 @@ func TestUsecase_GetTodosByUserID_ContextCancellation(t *testing.T) {
 func TestUsecase_UpdateTodo(t *testing.T) {
 	now := time.Now()
 	content := "テスト内容"
+	updatedContent := "更新後の内容"
 
 	tests := []struct {
 		name           string
@@ -168,7 +169,7 @@ func TestUsecase_UpdateTodo(t *testing.T) {
 			name:   "正常系: TODOを更新",
 			userID: 1,
 			todoID: 1,
-			input:  UpdateInput{Title: "更新後のタイトル", Content: "更新後の内容", IsCompleted: true},
+			input:  UpdateInput{Title: "更新後のタイトル", Content: &updatedContent, IsCompleted: true},
 			existingTodo: &Todo{
 				ID: 1, UserID: 1, Title: "元のタイトル", Content: &content, IsCompleted: false, CreatedAt: now, UpdatedAt: now,
 			},
@@ -192,7 +193,7 @@ func TestUsecase_UpdateTodo(t *testing.T) {
 				ID: 1, UserID: 1, Title: "元のタイトル", Content: &content, IsCompleted: false, CreatedAt: now, UpdatedAt: now,
 			},
 			expectedError:  true,
-			expectedErrMsg: "forbidden",
+			expectedErrMsg: "[FORBIDDEN] forbidden",
 		},
 		{
 			name:   "異常系: 更新時にエラー",
@@ -289,7 +290,7 @@ func TestUsecase_DeleteTodo(t *testing.T) {
 				ID: 1, UserID: 1, Title: "テストTODO", Content: &content, IsCompleted: false, CreatedAt: now, UpdatedAt: now,
 			},
 			expectedError:  true,
-			expectedErrMsg: "forbidden",
+			expectedErrMsg: "[FORBIDDEN] forbidden",
 		},
 		{
 			name:   "異常系: 削除時にエラー",
@@ -313,7 +314,7 @@ func TestUsecase_DeleteTodo(t *testing.T) {
 					}
 					return tt.existingTodo, tt.findByIDError
 				},
-				deleteFunc: func(ctx context.Context, id int) error {
+				deleteFunc: func(ctx context.Context, id int, userID int) error {
 					return tt.deleteError
 				},
 			}
