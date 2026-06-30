@@ -395,23 +395,3 @@ cron(0 0 * * ? *)   # 毎日 00:00 UTC（日本時間 09:00 JST）
 
 `usecase/notification_usecase_test.go` にてユニットテストを実施。
 DB・SES・AWSへの依存はすべてモックで置き換える。
-
-### 実装済みテストケース
-
-| テスト名 | 確認内容 |
-|----------|---------|
-| `TestCheckAndSendNotifications_Approaching` | 期日48時間後のTODOに `approaching` 通知が送信・記録されること |
-| `TestCheckAndSendNotifications_Overdue` | 期日24時間前のTODOに `overdue` 通知が送信・記録されること |
-| `TestCheckAndSendNotifications_DuplicateSkip` | 送信済みTODOに対して通知が重複送信されないこと |
-| `TestCheckAndSendNotifications_NoDueDate` | 期日なしTODOに対して通知が送信されないこと |
-| `TestCheckAndSendNotifications_FarFutureDueDate` | 期日が10日後のTODOに対して通知が送信されないこと |
-
-### 追加推奨テストケース
-
-| テスト名 | 確認内容 |
-|----------|---------|
-| `TestCheckAndSendNotifications_UserNotFound` | ユーザーが存在しない場合にスキップして処理継続すること |
-| `TestCheckAndSendNotifications_InvalidRecipient` | SES個別アドレスエラー時にスキップして処理継続すること |
-| `TestCheckAndSendNotifications_SESServiceError` | SESサービス障害時に全体処理がエラーで終了すること |
-| `TestCheckAndSendNotifications_DuplicateCheckDBError` | 重複確認DBエラー時にスキップ（安全側）して処理継続すること |
-| `TestCheckAndSendNotifications_RecordSaveFailure` | レコード保存失敗時にログのみ出力して処理継続すること |
