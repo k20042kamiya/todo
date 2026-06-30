@@ -17,9 +17,10 @@ func NewDB() (*gorm.DB, error) {
 		Net:       "tcp",
 		Addr:      os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
 		DBName:    os.Getenv("DB_NAME"),
-		Params:    map[string]string{"charset": "utf8mb4"},
-		ParseTime: true,
-		Loc:       time.UTC,
+		Params:               map[string]string{"charset": "utf8mb4"},
+		ParseTime:            true,
+		Loc:                  time.UTC,
+		AllowNativePasswords: true,
 	}
 
 	db, err := gorm.Open(mysql.Open(cfg.FormatDSN()), &gorm.Config{
