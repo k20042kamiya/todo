@@ -413,7 +413,7 @@ func TestHandler_DeleteTodo_Unauthorized(t *testing.T) {
 func TestTodoResponse_JSONFields(t *testing.T) {
 	now := time.Now()
 	content := "テスト内容"
-	dueDate := now.Add(24 * time.Hour)
+	dueDate := DateOnly{now.Add(24 * time.Hour)}
 
 	response := TodoResponse{
 		ID: 1, UserID: 1, Title: "テストタイトル", Content: &content,
