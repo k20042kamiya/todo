@@ -9,7 +9,6 @@ import ErrorAlertDialog from '@/components/ErrorAlertDialog.vue'
 import { useTodos } from '@/composables/useTodos'
 import { useTodoFilter } from '@/composables/useTodoFilter'
 import { useAuth } from '@/composables/useAuth'
-import { useRouter } from 'vue-router'
 
 const {
   fetchTodos, addTodo, editTodo, removeTodo, toggleComplete, removeCompleted, error
@@ -18,7 +17,6 @@ const {
   currentFilter, filteredTodos, remainingCount, completedCount, progressPercentage, setFilter
 } = useTodoFilter()
 const { logout } = useAuth()
-const router = useRouter()
 
 const showModal = ref(false)
 const editingTodo = ref<Todo | null>(null)
@@ -57,8 +55,8 @@ async function handleSave(data: CreateTodoRequest | UpdateTodoRequest) {
 }
 
 async function handleLogout() {
+  // ログイン画面への遷移は router 側の認証状態 watch が行う
   await logout()
-  router.push('/login')
 }
 
 function getFormattedDate(): string {
