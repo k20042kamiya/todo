@@ -20,11 +20,17 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to, from, next) => {
-  const { user, loading } = useAuth()
+const { user, loading } = useAuth()
 
+// ログアウトや認証切れでユーザーがいなくなったら、どの画面にいてもログイン画面へ遷移する
+watch(user, (currentUser) => {
+  if (!currentUser && !loading.value && router.currentRoute.value.name !== 'login') {
+    router.push({ name: 'login' })
+  }
+})
+
+router.beforeEach(async (to) => {
   if (to.name === 'login') {
-    next()
     return
   }
 
@@ -40,9 +46,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (!user.value) {
-    next({ name: 'login' })
-  } else {
-    next()
+    return { name: 'login' }
   }
 })
 

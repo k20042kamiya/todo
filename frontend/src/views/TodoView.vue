@@ -5,10 +5,10 @@ import TodoStats from '@/components/TodoStats.vue'
 import TodoFilter from '@/components/TodoFilter.vue'
 import TodoList from '@/components/TodoList.vue'
 import TodoFormModal from '@/components/TodoFormModal.vue'
+import ErrorAlertDialog from '@/components/ErrorAlertDialog.vue'
 import { useTodos } from '@/composables/useTodos'
 import { useTodoFilter } from '@/composables/useTodoFilter'
 import { useAuth } from '@/composables/useAuth'
-import { useRouter } from 'vue-router'
 
 const {
   fetchTodos, addTodo, editTodo, removeTodo, toggleComplete, removeCompleted, error
@@ -17,7 +17,6 @@ const {
   currentFilter, filteredTodos, remainingCount, completedCount, progressPercentage, setFilter
 } = useTodoFilter()
 const { logout } = useAuth()
-const router = useRouter()
 
 const showModal = ref(false)
 const editingTodo = ref<Todo | null>(null)
@@ -56,8 +55,8 @@ async function handleSave(data: CreateTodoRequest | UpdateTodoRequest) {
 }
 
 async function handleLogout() {
+  // ログイン画面への遷移は router 側の認証状態 watch が行う
   await logout()
-  router.push('/login')
 }
 
 function getFormattedDate(): string {
@@ -105,13 +104,17 @@ function getFormattedDate(): string {
       @delete="removeTodo"
     />
 
-    <div v-if="error" class="error-banner">{{ error }}</div>
-
     <TodoFormModal
       v-if="showModal"
       :todo="editingTodo"
       @save="handleSave"
       @close="closeModal"
+    />
+
+    <ErrorAlertDialog
+      v-if="error"
+      :message="error"
+      @close="error = null"
     />
   </div>
 </template>
@@ -177,15 +180,5 @@ function getFormattedDate(): string {
 
 .btn-new-task:hover {
   background-color: #d55a40;
-}
-
-.error-banner {
-  background-color: #fff0ed;
-  border: 1px solid #e86c50;
-  color: #c0392b;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  margin-bottom: 12px;
 }
 </style>

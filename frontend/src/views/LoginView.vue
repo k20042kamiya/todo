@@ -1,33 +1,42 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
 import { useAuth } from '@/composables/useAuth'
 import { useRouter } from 'vue-router'
 
-const { login, register } = useAuth()
+const { login, register, logout } = useAuth()
 const router = useRouter()
 
-const email = ref('')
-const password = ref('')
-const errorMessage = ref('')
-const isLoginMode = ref(true)
+const email = shallowRef('')
+const password = shallowRef('')
+const errorMessage = shallowRef('')
+const successMessage = shallowRef('')
+const isLoginMode = shallowRef(true)
 
 async function handleSubmit() {
   errorMessage.value = ''
+  successMessage.value = ''
   try {
     if (isLoginMode.value) {
       await login(email.value, password.value)
+      router.push('/')
     } else {
       await register(email.value, password.value)
+      // Firebase/モックとも登録時に自動ログインされるため、一度ログアウトして
+      // ログインモードに戻し、ユーザー自身にログインしてもらう
+      await logout()
+      isLoginMode.value = true
+      password.value = ''
+      successMessage.value = '登録が完了しました。ログインしてください'
     }
-    router.push('/')
   } catch (error) {
-    errorMessage.value = 'ログインに失敗しました'
+    errorMessage.value = isLoginMode.value ? 'ログインに失敗しました' : '登録に失敗しました'
   }
 }
 
 function toggleMode() {
   isLoginMode.value = !isLoginMode.value
   errorMessage.value = ''
+  successMessage.value = ''
 }
 </script>
 
@@ -36,7 +45,8 @@ function toggleMode() {
     <div class="login-card">
       <h1 class="login-title">{{ isLoginMode ? 'ログイン' : 'ユーザー登録' }}</h1>
 
-      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <div v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</div>
+      <div v-if="successMessage" class="success-banner" role="status">{{ successMessage }}</div>
 
       <form @submit.prevent="handleSubmit">
         <div class="form-group">
@@ -98,8 +108,23 @@ function toggleMode() {
   margin-bottom: 32px;
 }
 
-.error-message {
-  color: #e86c50;
+.error-banner {
+  background-color: #fff0ed;
+  border: 1px solid #e86c50;
+  color: #c0392b;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.success-banner {
+  background-color: #edf7ee;
+  border: 1px solid #4caf50;
+  color: #2e7d32;
+  padding: 10px 16px;
+  border-radius: 8px;
   font-size: 13px;
   margin-bottom: 16px;
   text-align: center;

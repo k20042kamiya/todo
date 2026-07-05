@@ -1,14 +1,15 @@
 import type { Todo, TodoListResponse, CreateTodoRequest, UpdateTodoRequest } from '@/types/todo'
-import { auth } from '@/lib/firebase'
+import { authClient } from '@/lib/authClient'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-  if (!auth.currentUser) {
+  const user = authClient.getCurrentUser()
+  if (!user) {
     throw new Error('ユーザーがログインしていません')
   }
 
-  const token = await auth.currentUser.getIdToken()
+  const token = await user.getIdToken()
 
   const response = await fetch(url, {
     ...options,
