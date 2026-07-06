@@ -7,7 +7,6 @@ import (
 
 	"notification/domain/entity"
 	"notification/domain/repository"
-	"notification/infrastructure/database"
 
 	"gorm.io/gorm"
 )
@@ -21,7 +20,7 @@ func NewNotificationRepository(db *gorm.DB) repository.NotificationRepository {
 }
 
 func (r *notificationRepository) getDB(ctx context.Context) *gorm.DB {
-	return database.GetTx(ctx, r.db)
+	return r.db.WithContext(ctx)
 }
 
 func (r *notificationRepository) FindTodayByTodoID(ctx context.Context, todoID int) (*entity.Notification, error) {

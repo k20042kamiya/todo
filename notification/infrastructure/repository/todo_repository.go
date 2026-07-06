@@ -5,7 +5,6 @@ import (
 
 	"notification/domain/entity"
 	"notification/domain/repository"
-	"notification/infrastructure/database"
 
 	"gorm.io/gorm"
 )
@@ -19,7 +18,7 @@ func NewTodoRepository(db *gorm.DB) repository.TodoRepository {
 }
 
 func (r *todoRepository) getDB(ctx context.Context) *gorm.DB {
-	return database.GetTx(ctx, r.db)
+	return r.db.WithContext(ctx)
 }
 
 func (r *todoRepository) FindUncompletedTodosWithDueDate(ctx context.Context) ([]*entity.Todo, error) {
