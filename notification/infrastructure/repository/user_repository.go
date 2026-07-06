@@ -7,7 +7,6 @@ import (
 
 	"notification/domain/entity"
 	"notification/domain/repository"
-	"notification/infrastructure/database"
 
 	"gorm.io/gorm"
 )
@@ -21,7 +20,7 @@ func NewUserRepository(db *gorm.DB) repository.UserRepository {
 }
 
 func (r *userRepository) getDB(ctx context.Context) *gorm.DB {
-	return database.GetTx(ctx, r.db)
+	return r.db.WithContext(ctx)
 }
 
 func (r *userRepository) FindByID(ctx context.Context, id int) (*entity.User, error) {
