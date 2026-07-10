@@ -91,25 +91,23 @@ func (u *notificationUsecase) CheckAndSendNotifications(ctx context.Context) err
 }
 
 func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo *entity.Todo, notifType string) (bool, error) {
-	// 重複確認: DBエラー時は安全側（重複送信を避けるため）スキップ
+	// 重複確認: 既に本日送信済みならスキップ。DBエラーは異常系として即中断
 	existing, err := u.notificationRepo.FindTodayByTodoID(ctx, todo.ID)
 	if err != nil {
-		slog.WarnContext(ctx, "重複チェック失敗のためスキップ（安全側）", "todo_id", todo.ID, "error", err)
-		return false, nil
+		return false, fmt.Errorf("重複チェックに失敗: todoID=%d, %w", todo.ID, err)
 	}
 	if existing != nil {
 		return false, nil
 	}
 
-	// ユーザー取得
+	// ユーザー取得: 存在しない場合のみwarnでスキップ。それ以外のエラーは即中断
 	user, err := u.userRepo.FindByID(ctx, todo.UserID)
 	if err != nil {
 		if errors.Is(err, entity.ErrNotFound) {
 			slog.WarnContext(ctx, "通知対象ユーザーが存在しないためスキップ", "todo_id", todo.ID, "user_id", todo.UserID)
 			return false, nil
 		}
-		slog.WarnContext(ctx, "ユーザー取得に失敗", "todo_id", todo.ID, "user_id", todo.UserID, "error", err)
-		return false, nil
+		return false, fmt.Errorf("ユーザー取得に失敗: todoID=%d, userID=%d, %w", todo.ID, todo.UserID, err)
 	}
 
 	// メール送信（先に送信してから記録する）
@@ -128,8 +126,9 @@ func (u *notificationUsecase) sendNotificationIfNeeded(ctx context.Context, todo
 		UserID: todo.UserID,
 		Type:   notifType,
 	}
+	// DBエラーは異常系として即中断。メールは送信済みのため翌日再送されうる（at-least-once）
 	if err := u.notificationRepo.Create(ctx, notification); err != nil {
-		slog.ErrorContext(ctx, "通知レコード保存失敗（メールは送信済み）", "todo_id", todo.ID, "error", err)
+		return true, fmt.Errorf("通知レコード保存に失敗（メールは送信済み）: todoID=%d, %w", todo.ID, err)
 	}
 
 	slog.InfoContext(ctx, "通知送信完了", "todo_id", todo.ID, "type", notifType, "to", user.Email)

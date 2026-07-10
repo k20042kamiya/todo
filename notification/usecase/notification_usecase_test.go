@@ -431,15 +431,56 @@ func TestCheckAndSendNotifications_DuplicateCheckDBError(t *testing.T) {
 	}
 
 	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
-	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
-		t.Fatalf("処理継続されるべきなのにエラーが返った: %v", err)
+	if err := uc.CheckAndSendNotifications(context.Background()); err == nil {
+		t.Fatal("重複確認DBエラーは異常系として中断されるべきなのにエラーが返らなかった")
 	}
 
 	if sendCalled {
-		t.Error("重複確認DBエラー時にメールが送信された（安全側スキップされるべき）")
+		t.Error("重複確認DBエラー時にメールが送信された（中断されるべき）")
 	}
 	if createCalled {
-		t.Error("重複確認DBエラー時に通知レコードが作成された（安全側スキップされるべき）")
+		t.Error("重複確認DBエラー時に通知レコードが作成された（中断されるべき）")
+	}
+}
+
+func TestCheckAndSendNotifications_ContextExpired(t *testing.T) {
+	dueDate := time.Now().Add(-24 * time.Hour)
+	todos := []*entity.Todo{
+		{ID: 11, UserID: 1, Title: "タイムアウトTodo", DueDate: &dueDate, IsCompleted: false},
+	}
+
+	sendCalled := false
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // バッチタイムアウト発動後の状態を再現
+
+	notifRepo := &mockNotificationRepository{
+		findTodayByTodoIDFunc: func(ctx context.Context, todoID int) (*entity.Notification, error) {
+			return nil, ctx.Err()
+		},
+	}
+
+	todoRepo := &mockTodoRepository{
+		findUncompletedTodosWithDueDateFunc: func(ctx context.Context) ([]*entity.Todo, error) {
+			return todos, nil
+		},
+	}
+
+	userRepo := &mockUserRepository{}
+	emailSender := &mockEmailSender{
+		sendFunc: func(ctx context.Context, to, subject, body string) error {
+			sendCalled = true
+			return nil
+		},
+	}
+
+	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
+	if err := uc.CheckAndSendNotifications(ctx); err == nil {
+		t.Fatal("コンテキスト期限切れ時にエラーが返らなかった（exit 1で検知されるべき）")
+	}
+
+	if sendCalled {
+		t.Error("コンテキスト期限切れ後にメールが送信された")
 	}
 }
 
@@ -480,8 +521,8 @@ func TestCheckAndSendNotifications_RecordSaveFailure(t *testing.T) {
 	}
 
 	uc := NewNotificationUsecase(notifRepo, todoRepo, userRepo, emailSender, "https://example.com")
-	if err := uc.CheckAndSendNotifications(context.Background()); err != nil {
-		t.Fatalf("レコード保存失敗は処理継続されるべきなのにエラーが返った: %v", err)
+	if err := uc.CheckAndSendNotifications(context.Background()); err == nil {
+		t.Fatal("レコード保存失敗は異常系として中断されるべきなのにエラーが返らなかった")
 	}
 
 	if !sendCalled {
