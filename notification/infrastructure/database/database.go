@@ -21,6 +21,11 @@ func NewDB() (*gorm.DB, error) {
 		ParseTime:            true,
 		Loc:                  time.UTC,
 		AllowNativePasswords: true,
+		// ネットワーク断・RDS無応答時に無期限で固まらないための防御
+		// （一次防御はmainのcontext.WithTimeout）
+		Timeout:      10 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
 	}
 
 	db, err := gorm.Open(mysql.Open(cfg.FormatDSN()), &gorm.Config{

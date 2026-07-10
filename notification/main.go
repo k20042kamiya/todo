@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"notification/infrastructure/database"
 	"notification/infrastructure/email"
@@ -12,14 +13,12 @@ import (
 	"notification/usecase"
 )
 
-func run(ctx context.Context) (retErr error) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.ErrorContext(ctx, "unexpected panic", "panic", r)
-			retErr = fmt.Errorf("unexpected panic: %v", r)
-		}
-	}()
+// batchTimeout はバッチ全体の実行時間上限。
+// 正常時は数秒で完了するため、ハング時の被害（Fargate課金・翌日実行との並行）を
+// この時間で打ち切る。ctxは全レイヤー（GORM/SES）に伝播済みのため全経路に効く。
+const batchTimeout = 10 * time.Minute
 
+func run(ctx context.Context) error {
 	slog.InfoContext(ctx, "バッチ処理開始")
 
 	db, err := database.NewDB()
@@ -56,7 +55,8 @@ func run(ctx context.Context) (retErr error) {
 }
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), batchTimeout)
+	defer cancel()
 	if err := run(ctx); err != nil {
 		slog.ErrorContext(ctx, "バッチ処理が失敗しました", "error", err)
 		os.Exit(1)
