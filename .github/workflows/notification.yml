@@ -32,8 +32,17 @@
 
 name: Notification CI/CD
 
+# PRではテストのみ実行し、mainへのマージ(push)でテスト+デプロイを行う
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "notification/**"
+      - ".github/workflows/notification.yml"
   push:
+    branches:
+      - main
     paths:
       - "notification/**"
       - ".github/workflows/notification.yml"

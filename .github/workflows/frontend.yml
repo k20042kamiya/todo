@@ -36,8 +36,17 @@
 
 name: Frontend CI/CD
 
+# PRではテストのみ実行し、mainへのマージ(push)でテスト+デプロイを行う
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
   push:
+    branches:
+      - main
     paths:
       - "frontend/**"
       - ".github/workflows/frontend.yml"
