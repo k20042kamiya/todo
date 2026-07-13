@@ -112,6 +112,8 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      task-def-arn: ${{ steps.register.outputs.task-def-arn }}
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -119,25 +121,49 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Run DB migration on ECS
+      # 新イメージを指すタスク定義リビジョンを先に登録する。
+      # run-taskのoverridesではimageを差し替えられないため、
+      # 最新リビジョン(=前回デプロイの旧イメージ)のまま起動すると
+      # 新しいマイグレーションファイルが存在せず適用されない。
+      - name: Register task definition with new image
+        id: register
         env:
-          CLUSTER: ${{ vars.ECS_CLUSTER_NAME }}
           TASK_FAMILY: ${{ vars.ECS_TASK_DEFINITION }}
-          SUBNET_IDS: ${{ vars.ECS_MIGRATE_SUBNET_IDS }}
-          SECURITY_GROUP_ID: ${{ vars.ECS_MIGRATE_SECURITY_GROUP_ID }}
+          CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
           IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
         run: |
-          TASK_DEF_ARN=$(aws ecs describe-task-definition \
+          NEW_TASK_DEF=$(aws ecs describe-task-definition \
             --task-definition "$TASK_FAMILY" \
+            --query "taskDefinition" \
+            | jq --arg NAME "$CONTAINER_NAME" --arg IMAGE "$IMAGE_URI" '
+                .containerDefinitions |= map(
+                  if .name == $NAME then .image = $IMAGE else . end
+                )
+                | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                      .compatibilities, .registeredAt, .registeredBy)')
+
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
             --query "taskDefinition.taskDefinitionArn" \
             --output text)
 
+          echo "New task definition: $TASK_DEF_ARN"
+          echo "task-def-arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Run DB migration on ECS
+        env:
+          CLUSTER: ${{ vars.ECS_CLUSTER_NAME }}
+          CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+          TASK_DEF_ARN: ${{ steps.register.outputs.task-def-arn }}
+          SUBNET_IDS: ${{ vars.ECS_MIGRATE_SUBNET_IDS }}
+          SECURITY_GROUP_ID: ${{ vars.ECS_MIGRATE_SECURITY_GROUP_ID }}
+        run: |
           TASK_ARN=$(aws ecs run-task \
             --cluster "$CLUSTER" \
             --task-definition "$TASK_DEF_ARN" \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SECURITY_GROUP_ID],assignPublicIp=ENABLED}" \
-            --overrides "{\"containerOverrides\":[{\"name\":\"api\",\"command\":[\"./migrate\"]}]}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"$CONTAINER_NAME\",\"command\":[\"./migrate\"]}]}" \
             --query "tasks[0].taskArn" \
             --output text)
 
@@ -171,27 +197,22 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Download current task definition
-        env:
-          TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition "$TASK_DEFINITION" \
-            --query taskDefinition \
-            > task-definition.json
-
-      - name: Update image in task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ vars.ECS_CONTAINER_NAME }}
-          image: ${{ needs.build-and-push.outputs.image-uri }}
-
+      # migrateジョブが登録・検証済みのリビジョンをそのままサービスに適用する
       - name: Deploy to ECS service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ vars.ECS_SERVICE_NAME }}
-          cluster: ${{ vars.ECS_CLUSTER_NAME }}
-          wait-for-service-stability: true
+        env:
+          CLUSTER: ${{ vars.ECS_CLUSTER_NAME }}
+          SERVICE: ${{ vars.ECS_SERVICE_NAME }}
+          TASK_DEF_ARN: ${{ needs.migrate.outputs.task-def-arn }}
+        run: |
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "$TASK_DEF_ARN" \
+            --query "service.taskDefinition" \
+            --output text
+
+          echo "Waiting for service stability..."
+          aws ecs wait services-stable \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE"
+          echo "Deploy completed"
