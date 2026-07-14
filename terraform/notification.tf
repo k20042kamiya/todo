@@ -80,4 +80,8 @@ resource "aws_scheduler_schedule" "daily_notification" {
       }
     }
   }
+
+  lifecycle {
+    ignore_changes = [target[0].ecs_parameters[0].task_definition_arn]
+  }
 }

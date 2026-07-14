@@ -20,7 +20,8 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  backup_retention_period   = 0
+  backup_retention_period   = 1
+  backup_window             = "17:00-18:00" # JST 2:00-3:00
   deletion_protection       = true
   skip_final_snapshot       = false
   final_snapshot_identifier = "${local.name_prefix}-final-snapshot"
