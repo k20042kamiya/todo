@@ -7,7 +7,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: [data: { title: string; content: string; due_date?: string }]
+  save: [data: { title: string; content: string | null; due_date?: string }]
   close: []
 }>()
 
@@ -32,7 +32,8 @@ function handleSubmit() {
 
   emit('save', {
     title: title.value,
-    content: content.value,
+    // 未入力は「値なし」として null で送る（DB上の NULL と '' を区別する方針）
+    content: content.value || null,
     due_date: dueDate.value || undefined,
   })
 }

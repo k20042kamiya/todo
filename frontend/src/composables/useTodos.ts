@@ -54,13 +54,18 @@ export function useTodos() {
   }
 
   async function toggleComplete(todo: Todo): Promise<void> {
+    // 完了状態の切り替えでは他のフィールドを変化させない（content の null はそのまま送る）
     const data: UpdateTodoRequest = {
       title: todo.title,
-      content: todo.content ?? '',
+      content: todo.content,
       due_date: todo.due_date ?? undefined,
       is_completed: !todo.is_completed,
     }
-    await editTodo(todo.id, data)
+    try {
+      await editTodo(todo.id, data)
+    } catch {
+      // error.value は editTodo 側でセット済み。イベントハンドラから直接呼ばれるため未処理拒否を防ぐ
+    }
   }
 
   async function removeCompleted(): Promise<void> {

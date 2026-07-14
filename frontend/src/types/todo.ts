@@ -15,13 +15,13 @@ export interface TodoListResponse {
 
 export interface CreateTodoRequest {
   title: string
-  content?: string
+  content?: string | null
   due_date?: string
 }
 
 export interface UpdateTodoRequest {
   title: string
-  content: string
+  content: string | null
   due_date?: string
   is_completed: boolean
 }
