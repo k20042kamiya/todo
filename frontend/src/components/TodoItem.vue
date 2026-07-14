@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Todo } from '@/types/todo'
+import { isPastDue } from '@/lib/date'
 
 const props = defineProps<{
   todo: Todo
@@ -13,7 +14,7 @@ const emit = defineEmits<{
 
 function isOverdue(): boolean {
   if (!props.todo.due_date || props.todo.is_completed) return false
-  return new Date(props.todo.due_date) < new Date()
+  return isPastDue(props.todo.due_date)
 }
 
 function formatDate(dateString: string): string {

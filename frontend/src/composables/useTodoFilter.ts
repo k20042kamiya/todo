@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import type { FilterType } from '@/types/todo'
 import { useTodos } from './useTodos'
+import { isPastDue } from '@/lib/date'
 
 export function useTodoFilter() {
   const { todos } = useTodos()
@@ -17,7 +18,7 @@ export function useTodoFilter() {
       case 'overdue':
         return todos.value.filter(t => {
           if (!t.due_date || t.is_completed) return false
-          return new Date(t.due_date) < new Date()
+          return isPastDue(t.due_date)
         })
       default:
         return todos.value
